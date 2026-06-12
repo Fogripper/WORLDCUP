@@ -28,7 +28,10 @@ export default {
       const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
         headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
       });
-      if (!resp.ok) return new Response(JSON.stringify({ error: "API error" }), { status: resp.status, headers: { ...cors, "Content-Type": "application/json" } });
+      if (!resp.ok) {
+  const errText = await resp.text();
+  return new Response(JSON.stringify({ error: "API error", status: resp.status, detail: errText }), { status: resp.status, headers: { ...cors, "Content-Type": "application/json" } });
+}
       const data = await resp.json();
       const matches = (data.matches || []).map(m => {
         const h = m.homeTeam.name || "?", a = m.awayTeam.name || "?";
