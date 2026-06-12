@@ -28,10 +28,7 @@ export default {
       const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
         headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
       });
-      if (!resp.ok) {
-  const errText = await resp.text();
-  return new Response(JSON.stringify({ error: "API error", status: resp.status, detail: errText }), { status: resp.status, headers: { ...cors, "Content-Type": "application/json" } });
-}
+      if (!resp.ok) return new Response(JSON.stringify({ error: "API error" }), { status: resp.status, headers: { ...cors, "Content-Type": "application/json" } });
       const data = await resp.json();
       const matches = (data.matches || []).map(m => {
         const h = m.homeTeam.name || "?", a = m.awayTeam.name || "?";
@@ -90,5 +87,32 @@ export default {
 
     // --- Vše ostatní: 404 (frontend je na Pages) ---
     return new Response("Not found", { status: 404 });
+  },
+
+  async scheduled(event, env, ctx) {
+    const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
+      headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    const current = await env.TIPPING_KV.get("ms2026_state");
+    const state = current ? JSON.parse(current) : {};
+    if (!state.results) state.results = {};
+
+    (data.matches || []).forEach(m => {
+      if (["FINISHED","IN_PLAY","PAUSED"].includes(m.status)) {
+        const sc = m.score && m.score.fullTime;
+        state.results["m" + m.id] = {
+          home: sc ? sc.home : 0,
+          away: sc ? sc.away : 0,
+          status: m.status,
+          minute: m.minute || null,
+        };
+      }
+    });
+
+    state.lastSync = new Date().toISOString();
+    await env.TIPPING_KV.put("ms2026_state", JSON.stringify(state));
   },
 };
