@@ -1,5 +1,5 @@
 const FLAGS = {
-  "Bosnia and Herzegovina":"🇧🇦","Canada":"🇨🇦","United States":"🇺🇸","Paraguay":"🇵🇾",
+  "Bosnia and Herzegovina":"🇧🇦","Bosnia-Herzegovina":"🇧🇦","Canada":"🇨🇦","United States":"🇺🇸","Paraguay":"🇵🇾",
   "Qatar":"🇶🇦","Switzerland":"🇨🇭","Brazil":"🇧🇷","Morocco":"🇲🇦","Haiti":"🇭🇹",
   "Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Australia":"🇦🇺","Turkey":"🇹🇷","Germany":"🇩🇪","Curaçao":"🇨🇼",
   "Netherlands":"🇳🇱","Japan":"🇯🇵","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨","Sweden":"🇸🇪",
