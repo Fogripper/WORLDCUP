@@ -4,10 +4,10 @@ var currentUser = null;
 
 var ALL_TEAMS = [
   ["Algeria","🇩🇿"],["Argentina","🇦🇷"],["Australia","🇦🇺"],["Austria","🇦🇹"],
-  ["Belgium","🇧🇪"],["Bosnia and Herzegovina","🇧🇦"],["Brazil","🇧🇷"],["Cameroon","🇨🇲"],
-  ["Canada","🇨🇦"],["Cape Verde","🇨🇻"],["Chile","🇨🇱"],["China","🇨🇳"],
-  ["Colombia","🇨🇴"],["Congo","🇨🇬"],["Costa Rica","🇨🇷"],["Croatia","🇭🇷"],
-  ["Curaçao","🇨🇼"],["Czech Republic","🇨🇿"],["Denmark","🇩🇰"],["Ecuador","🇪🇨"],
+  ["Belgium","🇧🇪"],["Bosnia-Herzegovina","🇧🇦"],["Brazil","🇧🇷"],["Cameroon","🇨🇲"],
+  ["Canada","🇨🇦"],["Cape Verde Islands","🇨🇻"],["Chile","🇨🇱"],["China","🇨🇳"],
+  ["Colombia","🇨🇴"],["Congo DR","🇨🇬"],["Costa Rica","🇨🇷"],["Croatia","🇭🇷"],
+  ["Curaçao","🇨🇼"],["Czechia","🇨🇿"],["Denmark","🇩🇰"],["Ecuador","🇪🇨"],
   ["Egypt","🇪🇬"],["England","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],["France","🇫🇷"],["Germany","🇩🇪"],
   ["Ghana","🇬🇭"],["Haiti","🇭🇹"],["Honduras","🇭🇳"],["Indonesia","🇮🇩"],
   ["Iran","🇮🇷"],["Iraq","🇮🇶"],["Ivory Coast","🇨🇮"],["Jamaica","🇯🇲"],
@@ -76,17 +76,33 @@ async function loadState() {
   } catch(e) { console.error("loadState failed", e); }
 }
 
-async function loadMatches() {
+async function loadMatches(updateResults) {
   try {
     var r = await fetch("/api/matches");
     if (r.ok) {
       var data = await r.json();
       if (data.matches && data.matches.length > 0) {
         MATCHES = data.matches;
-        for (var i = 0; i < MATCHES.length; i++) {
-          var m = MATCHES[i];
-          if (m.score) {
-            state.results[m.id] = { home: m.score.home, away: m.score.away, status: m.status, minute: m.score.minute };
+        // Výsledky aktualizuj jen při explicitním syncu (tlačítko Aktualizovat)
+        if (updateResults) {
+          for (var i = 0; i < MATCHES.length; i++) {
+            var m = MATCHES[i];
+            if (m.score) {
+              state.results[m.id] = { home: m.score.home, away: m.score.away, status: m.status, minute: m.score.minute };
+            }
+          }
+        } else {
+          // Při načtení stránky nastav status zápasu (zamknutí tipování)
+          // ale zachovej existující výsledky z KV
+          for (var i = 0; i < MATCHES.length; i++) {
+            var m = MATCHES[i];
+            if (m.score && !state.results[m.id]) {
+              // Výsledek ještě není v KV — přidej ho
+              state.results[m.id] = { home: m.score.home, away: m.score.away, status: m.status, minute: m.score.minute };
+            } else if (m.score && state.results[m.id]) {
+              // Zachovej skóre z KV, ale aktualizuj status
+              state.results[m.id].status = m.status;
+            }
           }
         }
         return true;
@@ -234,7 +250,23 @@ function renderTips() {
 
       if (started) {
         html += '<div class="live-result">' + r.home + ' : ' + r.away + '</div>';
-        html += '<div class="match-meta">' + (r.status === "IN_PLAY" ? '<span><span class="live-dot"></span>ŽIVĚ</span>' : '<span class="finished-label">✓ Konec</span>') + '</div>';
+        var statusLabel = '';
+        if (r.status === 'IN_PLAY') {
+          statusLabel = '<span><span class="live-dot"></span>ŽIVĚ</span>';
+        } else if (r.status === 'FINISHED') {
+          var tt = state.tips[currentUser] && state.tips[currentUser][m.id];
+          if (tt && tt.home !== '' && tt.away !== '') {
+            var th = +tt.home, ta = +tt.away, rh = +r.home, ra = +r.away;
+            if (th === rh && ta === ra) statusLabel = '<span class="finished-label">🎯 Přesný tip!</span>';
+            else if (winner(th,ta) === winner(rh,ra)) statusLabel = '<span style="font-size:11px;color:var(--blue);font-weight:600">✓ Správný vítěz</span>';
+            else statusLabel = '<span style="font-size:11px;color:var(--red);font-weight:600">✗ Špatný tip</span>';
+          } else {
+            statusLabel = '<span class="finished-label">✓ Konec</span>';
+          }
+        } else {
+          statusLabel = '<span class="finished-label">✓ Konec</span>';
+        }
+        html += '<div class="match-meta">' + statusLabel + '</div>';
       } else if (locked) {
         html += '<div class="score-wrap"><span style="font-size:20px;font-weight:800">' + t.home + '</span><span class="score-sep">:</span><span style="font-size:20px;font-weight:800">' + t.away + '</span></div>';
         html += '<div class="match-meta">🔒 Uzamčeno · ' + m.date + ' ' + m.time + '</div>';
@@ -342,7 +374,7 @@ async function syncResults() {
   var icon = document.getElementById("sync-icon"), info = document.getElementById("sync-info");
   icon.classList.add("spinning"); info.textContent = "Načítám...";
   try {
-    await loadMatches();
+    await loadMatches(true);
     var now = new Date().toLocaleTimeString("cs", { hour: "2-digit", minute: "2-digit" });
     state.lastSync = now; await saveState();
     info.textContent = "Aktualizováno " + now;
