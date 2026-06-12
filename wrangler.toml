@@ -2,7 +2,7 @@ name = "ms2026-tipping"
 main = "worker.js"
 compatibility_date = "2024-01-01"
 
-assets = { directory = "." }
+assets = { directory = "public" }
 
 [[kv_namespaces]]
 binding = "TIPPING_KV"
