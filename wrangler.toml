@@ -7,3 +7,4 @@ assets = { directory = "public" }
 [[kv_namespaces]]
 binding = "TIPPING_KV"
 id = "a6331a9015d74006bc2104d1eb5b0359"
+
