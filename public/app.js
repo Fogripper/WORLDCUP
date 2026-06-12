@@ -3,17 +3,22 @@ var state = {users:{},tips:{},results:{},champion:{},championLocked:{},lockedTip
 var currentUser = null;
 
 var ALL_TEAMS = [
-  ["Argentina","🇦🇷"],["Australia","🇦🇺"],["Belgium","🇧🇪"],["Bosnia and Herzegovina","🇧🇦"],
-  ["Brazil","🇧🇷"],["Cameroon","🇨🇲"],["Canada","🇨🇦"],["Chile","🇨🇱"],["Colombia","🇨🇴"],
-  ["Costa Rica","🇨🇷"],["Croatia","🇭🇷"],["Curaçao","🇨🇼"],["Denmark","🇩🇰"],["Ecuador","🇪🇨"],
-  ["Egypt","🇪🇬"],["England","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],["France","🇫🇷"],["Germany","🇩🇪"],["Ghana","🇬🇭"],
-  ["Haiti","🇭🇹"],["Honduras","🇭🇳"],["Indonesia","🇮🇩"],["Iran","🇮🇷"],["Ivory Coast","🇨🇮"],
-  ["Jamaica","🇯🇲"],["Japan","🇯🇵"],["Mali","🇲🇱"],["Mexico","🇲🇽"],["Morocco","🇲🇦"],
-  ["Netherlands","🇳🇱"],["New Zealand","🇳🇿"],["Nigeria","🇳🇬"],["Panama","🇵🇦"],["Paraguay","🇵🇾"],
-  ["Peru","🇵🇪"],["Poland","🇵🇱"],["Portugal","🇵🇹"],["Qatar","🇶🇦"],["Romania","🇷🇴"],
-  ["Saudi Arabia","🇸🇦"],["Scotland","🏴󠁧󠁢󠁳󠁣󠁴󠁿"],["Senegal","🇸🇳"],["Serbia","🇷🇸"],["Slovakia","🇸🇰"],
-  ["South Korea","🇰🇷"],["Spain","🇪🇸"],["Sweden","🇸🇪"],["Switzerland","🇨🇭"],["Tunisia","🇹🇳"],
-  ["Turkey","🇹🇷"],["Ukraine","🇺🇦"],["United States","🇺🇸"],["Uruguay","🇺🇾"],["Venezuela","🇻🇪"]
+  ["Algeria","🇩🇿"],["Argentina","🇦🇷"],["Australia","🇦🇺"],["Austria","🇦🇹"],
+  ["Belgium","🇧🇪"],["Bosnia and Herzegovina","🇧🇦"],["Brazil","🇧🇷"],["Cameroon","🇨🇲"],
+  ["Canada","🇨🇦"],["Cape Verde","🇨🇻"],["Chile","🇨🇱"],["China","🇨🇳"],
+  ["Colombia","🇨🇴"],["Congo","🇨🇬"],["Costa Rica","🇨🇷"],["Croatia","🇭🇷"],
+  ["Curaçao","🇨🇼"],["Czech Republic","🇨🇿"],["Denmark","🇩🇰"],["Ecuador","🇪🇨"],
+  ["Egypt","🇪🇬"],["England","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],["France","🇫🇷"],["Germany","🇩🇪"],
+  ["Ghana","🇬🇭"],["Haiti","🇭🇹"],["Honduras","🇭🇳"],["Indonesia","🇮🇩"],
+  ["Iran","🇮🇷"],["Iraq","🇮🇶"],["Ivory Coast","🇨🇮"],["Jamaica","🇯🇲"],
+  ["Japan","🇯🇵"],["Mali","🇲🇱"],["Mexico","🇲🇽"],["Morocco","🇲🇦"],
+  ["Netherlands","🇳🇱"],["New Zealand","🇳🇿"],["Nigeria","🇳🇬"],["Norway","🇳🇴"],
+  ["Panama","🇵🇦"],["Paraguay","🇵🇾"],["Peru","🇵🇪"],["Poland","🇵🇱"],
+  ["Portugal","🇵🇹"],["Qatar","🇶🇦"],["Romania","🇷🇴"],["Saudi Arabia","🇸🇦"],
+  ["Scotland","🏴󠁧󠁢󠁳󠁣󠁴󠁿"],["Senegal","🇸🇳"],["Serbia","🇷🇸"],["Slovakia","🇸🇰"],
+  ["South Africa","🇿🇦"],["South Korea","🇰🇷"],["Spain","🇪🇸"],["Sweden","🇸🇪"],
+  ["Switzerland","🇨🇭"],["Tunisia","🇹🇳"],["Turkey","🇹🇷"],["Ukraine","🇺🇦"],
+  ["United States","🇺🇸"],["Uruguay","🇺🇾"],["Uzbekistan","🇺🇿"],["Venezuela","🇻🇪"]
 ];
 
 function toast(msg, dur) {
@@ -199,18 +204,25 @@ function renderTips() {
     return;
   }
   var tips = state.tips[currentUser] || {};
-  var groups = [];
-  for (var i = 0; i < MATCHES.length; i++) {
-    if (groups.indexOf(MATCHES[i].group) < 0) groups.push(MATCHES[i].group);
+  // Seřaď zápasy podle data a času
+  var sorted = MATCHES.slice().sort(function(a, b) {
+    var da = a.date + " " + a.time, db = b.date + " " + b.time;
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+  // Seskup podle dne
+  var days = [], dayMap = {};
+  for (var i = 0; i < sorted.length; i++) {
+    var d = sorted[i].date;
+    if (days.indexOf(d) < 0) { days.push(d); dayMap[d] = []; }
+    dayMap[d].push(sorted[i]);
   }
-  groups.sort();
   var html = "";
-  for (var gi = 0; gi < groups.length; gi++) {
-    var grp = groups[gi];
-    html += '<p class="section-label">Skupina ' + grp + '</p><div class="match-card">';
-    for (var i = 0; i < MATCHES.length; i++) {
-      var m = MATCHES[i];
-      if (m.group !== grp) continue;
+  for (var gi = 0; gi < days.length; gi++) {
+    var day = days[gi];
+    html += '<p class="section-label">' + day + '</p><div class="match-card">';
+    for (var i = 0; i < dayMap[day].length; i++) {
+      var m = dayMap[day][i];
+      if (false) continue; // dummy
       var t = tips[m.id] || { home: "", away: "" };
       var r = state.results[m.id];
       var started = r && ["FINISHED","IN_PLAY","PAUSED"].indexOf(r.status) >= 0;
@@ -278,17 +290,22 @@ function renderMyTips() {
     champSection = '<div class="champion-card" style="margin-bottom:16px"><h3>🏆 Tip na šampióna</h3><div style="display:flex;align-items:center;gap:10px;margin-top:8px"><span style="font-size:28px">' + flagFor(champ) + '</span><span style="font-size:16px;font-weight:700">' + champ + '</span>' + cb + '</div></div>';
   }
   var html = '<div class="metrics"><div class="metric"><div class="metric-val">' + p.pts + '</div><div class="metric-lbl">Celkem bodů</div></div><div class="metric"><div class="metric-val">' + p.winHit + '</div><div class="metric-lbl">Správný vítěz</div></div><div class="metric"><div class="metric-val">' + p.exact + '</div><div class="metric-lbl">Přesný výsledek</div></div></div>' + champSection;
-  var groups = [];
-  for (var i = 0; i < MATCHES.length; i++) {
-    if (groups.indexOf(MATCHES[i].group) < 0) groups.push(MATCHES[i].group);
+  var sorted2 = MATCHES.slice().sort(function(a, b) {
+    var da = a.date + " " + a.time, db = b.date + " " + b.time;
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+  var days2 = [], dayMap2 = {};
+  for (var i = 0; i < sorted2.length; i++) {
+    var d = sorted2[i].date;
+    if (days2.indexOf(d) < 0) { days2.push(d); dayMap2[d] = []; }
+    dayMap2[d].push(sorted2[i]);
   }
-  groups.sort();
-  for (var gi = 0; gi < groups.length; gi++) {
-    var grp = groups[gi];
-    html += '<p class="section-label">Skupina ' + grp + '</p><div class="match-card">';
-    for (var i = 0; i < MATCHES.length; i++) {
-      var m = MATCHES[i];
-      if (m.group !== grp) continue;
+  for (var gi = 0; gi < days2.length; gi++) {
+    var day2 = days2[gi];
+    html += '<p class="section-label">' + day2 + '</p><div class="match-card">';
+    for (var i = 0; i < dayMap2[day2].length; i++) {
+      var m = dayMap2[day2][i];
+      if (false) continue;
       var t = tips[m.id], r = state.results[m.id];
       var badge = "", tipHTML = '<span style="font-size:12px;color:var(--text3);font-style:italic">Netipováno</span>';
       if (t && (t.home !== "" || t.away !== "")) tipHTML = '<span class="tip-score">' + (t.home||"?") + ":" + (t.away||"?") + '</span>';
