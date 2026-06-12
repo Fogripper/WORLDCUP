@@ -89,5 +89,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 20px;font-size:14px;font-weight:500;opacity:0;transition:all .25s;pointer-events:none;z-index:999;white-space:nowrap;box-shadow:var(--shadow)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .loading{text-align:center;padding:40px;color:var(--text2);font-size:14px}
+.legend{display:flex;justify-content:center;align-items:center;gap:0;margin-bottom:24px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.legend-item{display:flex;align-items:center;gap:12px;padding:14px 20px;flex:1;justify-content:center}
+.legend-icon{font-size:22px;flex-shrink:0}
+.legend-title{font-size:13px;font-weight:600;color:var(--text)}
+.legend-desc{font-size:11px;color:var(--text3);margin-top:2px}
+.legend-pts{font-size:20px;font-weight:800;color:var(--gold);margin-left:auto;flex-shrink:0}
+.legend-divider{width:1px;height:50px;background:var(--border);flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
