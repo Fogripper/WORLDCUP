@@ -10,7 +10,7 @@ const FLAGS = {
   "Saudi Arabia":"🇸🇦","Costa Rica":"🇨🇷","Panama":"🇵🇦","Honduras":"🇭🇳","Jamaica":"🇯🇲",
   "Venezuela":"🇻🇪","Peru":"🇵🇪","Chile":"🇨🇱","Algeria":"🇩🇿","Egypt":"🇪🇬",
   "Mali":"🇲🇱","Ghana":"🇬🇭","Cameroon":"🇨🇲","China":"🇨🇳","Indonesia":"🇮🇩",
-  "Iraq":"🇮🇶","Ukraine":"🇺🇦","Romania":"🇷🇴","Slovakia":"🇸🇰","Austria":"🇦🇹",
+  "Iraq":"🇮🇶","Ukraine":"🇺🇦","Romania":"🇷🇴","Slovakia":"🇸🇰","Austria":"🇦🇹","Norway":"🇳🇴","Cape Verde":"🇨🇻","Congo":"🇨🇬","Uzbekistan":"🇺🇿","Czech Republic":"🇨🇿","Czechia":"🇨🇿",
 };
 
 export default {
