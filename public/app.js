@@ -20,7 +20,7 @@ var ALL_TEAMS = [
   ["Switzerland","🇨🇭"],["Tunisia","🇹🇳"],["Turkey","🇹🇷"],["Ukraine","🇺🇦"],
   ["United States","🇺🇸"],["Uruguay","🇺🇾"],["Uzbekistan","🇺🇿"],["Venezuela","🇻🇪"]
 ];
- 
+
 function toast(msg, dur) {
   dur = dur || 2500;
   var e = document.getElementById("toast");
@@ -28,13 +28,13 @@ function toast(msg, dur) {
   e.classList.add("show");
   setTimeout(function(){ e.classList.remove("show"); }, dur);
 }
- 
+
 function initials(n) {
   return n.split(" ").map(function(w){ return w[0]; }).join("").toUpperCase().slice(0,2);
 }
- 
+
 function winner(h, a) { return h > a ? "H" : h < a ? "A" : "D"; }
- 
+
 function flagFor(name) {
   for (var i = 0; i < MATCHES.length; i++) {
     if (MATCHES[i].home === name) return MATCHES[i].homeFlag;
@@ -45,7 +45,7 @@ function flagFor(name) {
   }
   return "🏳️";
 }
- 
+
 function calcPoints(uid) {
   var pts = 0, exact = 0, winHit = 0;
   var tips = state.tips[uid] || {};
@@ -60,7 +60,7 @@ function calcPoints(uid) {
   if (state.champion[uid] && state.tournamentWinner && state.champion[uid] === state.tournamentWinner) pts += 20;
   return { pts: pts, exact: exact, winHit: winHit };
 }
- 
+
 async function loadState() {
   try {
     var r = await fetch("/api/state");
@@ -75,7 +75,7 @@ async function loadState() {
     }
   } catch(e) { console.error("loadState failed", e); }
 }
- 
+
 async function loadMatches(updateResults) {
   try {
     var r = await fetch("/api/matches");
@@ -111,7 +111,7 @@ async function loadMatches(updateResults) {
   } catch(e) { console.error("loadMatches failed", e); }
   return false;
 }
- 
+
 async function saveState() {
   try {
     // Pojistka: nikdy neuložit prázdný nebo menší state než je v KV
@@ -156,7 +156,7 @@ async function saveState() {
     });
   } catch(e) { console.error("saveState failed", e); }
 }
- 
+
 function enterApp(n) {
   var isNew = !state.users[n];
   if (isNew) state.users[n] = { name: n };
@@ -171,7 +171,7 @@ function enterApp(n) {
   refreshPts();
   renderTips();
 }
- 
+
 function login() {
   var n = document.getElementById("name-input").value.trim();
   if (!n) return;
@@ -180,7 +180,7 @@ function login() {
   }
   enterApp(n);
 }
- 
+
 function logout() {
   currentUser = null;
   try { localStorage.removeItem("ms2026_user"); } catch(e) {}
@@ -188,12 +188,12 @@ function logout() {
   document.getElementById("main-screen").style.display = "none";
   document.getElementById("name-input").value = "";
 }
- 
+
 function refreshPts() {
   if (!currentUser) return;
   document.getElementById("u-pts").textContent = calcPoints(currentUser).pts + " bodů";
 }
- 
+
 function showTab(t, btn) {
   document.querySelectorAll(".tab").forEach(function(x) { x.classList.remove("active"); });
   document.querySelectorAll(".nav-btn").forEach(function(x) { x.classList.remove("active"); });
@@ -202,20 +202,21 @@ function showTab(t, btn) {
   if (t === "tips") renderTips();
   if (t === "mytips") renderMyTips();
   if (t === "lb") renderLb();
+  if (t === "others") renderOthers();
 }
- 
+
 function isTipLocked(mid) {
   if (state.lockedTips && state.lockedTips[currentUser] && state.lockedTips[currentUser][mid]) return true;
   var r = state.results[mid];
   return r && ["FINISHED","IN_PLAY","PAUSED"].indexOf(r.status) >= 0;
 }
- 
+
 function renderChampionPicker() {
   var wrap = document.getElementById("champion-picker-wrap");
   var locked = state.championLocked && state.championLocked[currentUser];
   var chosen = state.champion[currentUser];
   var tw = state.tournamentWinner;
- 
+
   if (locked && chosen) {
     var extra = tw
       ? (chosen === tw ? '<span class="badge gold" style="margin-left:10px">+20b 🎉</span>' : '<span class="badge miss" style="margin-left:10px">0b</span>')
@@ -231,13 +232,13 @@ function renderChampionPicker() {
     wrap.innerHTML = '<select class="champion-select" onchange="previewChampion(this.value)">' + opts + '</select>' + confirmBtn;
   }
 }
- 
+
 function previewChampion(val) {
   if (!val) return;
   state.champion[currentUser] = val;
   renderChampionPicker();
 }
- 
+
 function lockChampion() {
   var val = state.champion[currentUser];
   if (!val) return;
@@ -247,7 +248,7 @@ function lockChampion() {
   saveState(); renderChampionPicker(); refreshPts();
   toast("🏆 Tip uzamčen: " + val);
 }
- 
+
 function renderTips() {
   if (!currentUser) return;
   renderChampionPicker();
@@ -279,11 +280,11 @@ function renderTips() {
       var r = state.results[m.id];
       var started = r && ["FINISHED","IN_PLAY","PAUSED"].indexOf(r.status) >= 0;
       var locked = isTipLocked(m.id);
- 
+
       html += '<div class="match-row">';
       html += '<div class="team-side home"><span class="team-name">' + m.home + '</span><span class="flag">' + m.homeFlag + '</span></div>';
       html += '<div class="center-cell">';
- 
+
       if (started) {
         html += '<div class="live-result">' + r.home + ' : ' + r.away + '</div>';
         var statusLabel = '';
@@ -315,7 +316,7 @@ function renderTips() {
         html += '<div class="match-meta">' + m.date + ' ' + m.time + '</div>';
         html += '<button class="btn-sm" style="margin-top:6px;font-size:11px" onclick="lockTip(\'' + m.id + '\')">🔒 Potvrdit tip</button>';
       }
- 
+
       html += '</div>';
       html += '<div class="team-side away"><span class="flag">' + m.awayFlag + '</span><span class="team-name">' + m.away + '</span></div>';
       html += '</div>';
@@ -324,7 +325,7 @@ function renderTips() {
   }
   document.getElementById("tips-container").innerHTML = html;
 }
- 
+
 function saveTip(el, mid, side) {
   if (!currentUser || isTipLocked(mid)) return;
   if (!state.tips[currentUser]) state.tips[currentUser] = {};
@@ -332,7 +333,7 @@ function saveTip(el, mid, side) {
   state.tips[currentUser][mid][side] = el.value;
   saveState();
 }
- 
+
 function lockTip(mid) {
   var t = state.tips[currentUser] && state.tips[currentUser][mid];
   if (!t || t.home === "" || t.away === "") { toast("Nejdřív zadej obě skóre!"); return; }
@@ -343,7 +344,7 @@ function lockTip(mid) {
   saveState(); renderTips();
   toast("🔒 Tip uzamčen!");
 }
- 
+
 function renderMyTips() {
   if (!currentUser) return;
   var p = calcPoints(currentUser);
@@ -390,7 +391,69 @@ function renderMyTips() {
   document.getElementById("mytips-container").innerHTML = html;
   refreshPts();
 }
- 
+
+function renderOthers() {
+  var users = Object.keys(state.users).filter(function(u){ return u !== currentUser; });
+  if (!users.length) {
+    document.getElementById("others-container").innerHTML = '<p style="font-size:13px;color:var(--text2);text-align:center;padding:20px">Zatím nikdo jiný netipoval.</p>';
+    return;
+  }
+  // Seřaď zápasy stejně jako v Tipovat
+  var sorted = MATCHES.slice().sort(function(a,b){
+    var da=a.date+" "+a.time, db=b.date+" "+b.time;
+    return da<db?-1:da>db?1:0;
+  });
+  var days=[], dayMap={};
+  for(var i=0;i<sorted.length;i++){
+    var d=sorted[i].date;
+    if(days.indexOf(d)<0){days.push(d);dayMap[d]=[];}
+    dayMap[d].push(sorted[i]);
+  }
+  var html = '';
+  for(var gi=0;gi<days.length;gi++){
+    var day=days[gi];
+    html += '<p class="section-label">'+day+'</p><div class="match-card">';
+    for(var i=0;i<dayMap[day].length;i++){
+      var m=dayMap[day][i];
+      var r=state.results[m.id];
+      html += '<div style="padding:10px 16px;'+(i<dayMap[day].length-1?'border-bottom:1px solid var(--border)':'')+'">';
+      // Zápas header
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+      html += '<span class="flag" style="font-size:18px">'+m.homeFlag+'</span>';
+      html += '<span style="font-size:13px;font-weight:600">'+m.home+'</span>';
+      if(r&&r.status==='FINISHED') html += '<span style="font-size:13px;font-weight:800;margin:0 4px">'+r.home+':'+r.away+'</span>';
+      else html += '<span style="font-size:12px;color:var(--text3);margin:0 6px">vs</span>';
+      html += '<span style="font-size:13px;font-weight:600">'+m.away+'</span>';
+      html += '<span class="flag" style="font-size:18px">'+m.awayFlag+'</span>';
+      html += '<span style="font-size:11px;color:var(--text3);margin-left:auto">'+m.time+'</span>';
+      html += '</div>';
+      // Tipy hráčů
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for(var j=0;j<users.length;j++){
+        var u=users[j];
+        var t=state.tips[u]&&state.tips[u][m.id];
+        var tipStr = t&&t.home!==''&&t.away!=='' ? t.home+':'+t.away : '—';
+        var badge='';
+        if(t&&r&&t.home!==''&&t.away!==''&&r.status==='FINISHED'){
+          var th=+t.home,ta=+t.away,rh=+r.home,ra=+r.away;
+          if(th===rh&&ta===ra) badge='exact';
+          else if(winner(th,ta)===winner(rh,ra)) badge='win';
+          else badge='miss';
+        }
+        var bg = badge==='exact'?'var(--green-bg)':badge==='win'?'var(--blue-bg)':badge==='miss'?'var(--bg3)':'var(--bg3)';
+        var col = badge==='exact'?'var(--green)':badge==='win'?'var(--blue)':badge==='miss'?'var(--text3)':'var(--text2)';
+        html += '<div style="display:flex;align-items:center;gap:5px;background:'+bg+';border-radius:20px;padding:3px 10px">';
+        html += '<span style="font-size:11px;color:'+col+';font-weight:500">'+u+'</span>';
+        html += '<span style="font-size:12px;font-weight:700;color:'+col+'">'+tipStr+'</span>';
+        html += '</div>';
+      }
+      html += '</div></div>';
+    }
+    html += '</div>';
+  }
+  document.getElementById("others-container").innerHTML = html;
+}
+
 function renderLb() {
   var users = Object.keys(state.users);
   var ranked = users.map(function(u) { var p = calcPoints(u); return { name: u, pts: p.pts }; });
@@ -405,7 +468,7 @@ function renderLb() {
   html += '</div>';
   document.getElementById("lb-container").innerHTML = html;
 }
- 
+
 async function syncResults() {
   var icon = document.getElementById("sync-icon"), info = document.getElementById("sync-info");
   icon.classList.add("spinning"); info.textContent = "Načítám...";
@@ -425,7 +488,7 @@ async function syncResults() {
     icon.classList.remove("spinning");
   }
 }
- 
+
 (async function() {
   await loadState();
   await loadMatches(false);
@@ -437,4 +500,3 @@ async function syncResults() {
     if (saved && state.users[saved]) { enterApp(saved); return; }
   } catch(e) {}
 })();
- 
