@@ -120,29 +120,38 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
-      headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
-    });
-    if (!resp.ok) return;
-    const data = await resp.json();
+    try {
+      const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
+        headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
 
-    const current = await env.TIPPING_KV.get("ms2026_state");
-    const state = current ? JSON.parse(current) : {};
-    if (!state.results) state.results = {};
+      // Načti existující state — nikdy ho nepřepiš, jen přidej výsledky
+      const current = await env.TIPPING_KV.get("ms2026_state");
+      if (!current) return; // Pokud KV je prázdné, nic neděláme
+      const state = JSON.parse(current);
+      if (!state.results) state.results = {};
+      if (!state.users || Object.keys(state.users).length === 0) return; // Ochrana
 
-    (data.matches || []).forEach(m => {
-      if (["FINISHED","IN_PLAY","PAUSED"].includes(m.status)) {
-        const sc = m.score && m.score.fullTime;
-        state.results["m" + m.id] = {
-          home: sc ? sc.home : 0,
-          away: sc ? sc.away : 0,
-          status: m.status,
-          minute: m.minute || null,
-        };
-      }
-    });
+      (data.matches || []).forEach(m => {
+        if (["FINISHED","IN_PLAY","PAUSED"].includes(m.status)) {
+          const sc = m.score && m.score.fullTime;
+          state.results["m" + m.id] = {
+            home: sc ? sc.home : 0,
+            away: sc ? sc.away : 0,
+            status: m.status,
+            minute: m.minute || null,
+          };
+        }
+      });
 
-    state.lastSync = new Date().toISOString();
-    await env.TIPPING_KV.put("ms2026_state", JSON.stringify(state));
+      state.lastSync = new Date().toISOString();
+      const merged = JSON.stringify(state);
+      await env.TIPPING_KV.put("ms2026_state", merged);
+      await env.TIPPING_KV.put("ms2026_backup", merged);
+    } catch(e) {
+      console.error("scheduled sync failed:", e);
+    }
   },
 };
