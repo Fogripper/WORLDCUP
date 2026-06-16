@@ -61,8 +61,38 @@ export default {
     if (url.pathname === "/api/state" && request.method === "POST") {
       const body = await request.text();
       try {
-        JSON.parse(body);
-        await env.TIPPING_KV.put("ms2026_state", body);
+        const incoming = JSON.parse(body);
+        const incomingUsers = Object.keys(incoming.users || {}).length;
+
+        // Ochrana: nikdy nezapiš pokud by to smazalo uživatele
+        const existing = await env.TIPPING_KV.get("ms2026_state");
+        if (existing) {
+          const existingParsed = JSON.parse(existing);
+          const existingUsers = Object.keys(existingParsed.users || {}).length;
+          if (incomingUsers < existingUsers) {
+            // Merge - zachovej uživatele z KV kteří chybí v příchozím stavu
+            for (const u in existingParsed.users) {
+              if (!incoming.users[u]) {
+                incoming.users[u] = existingParsed.users[u];
+                if (existingParsed.tips[u]) incoming.tips[u] = existingParsed.tips[u];
+                if (existingParsed.champion[u]) incoming.champion[u] = existingParsed.champion[u];
+                if (existingParsed.championLocked?.[u]) {
+                  if (!incoming.championLocked) incoming.championLocked = {};
+                  incoming.championLocked[u] = existingParsed.championLocked[u];
+                }
+                if (existingParsed.lockedTips?.[u]) {
+                  if (!incoming.lockedTips) incoming.lockedTips = {};
+                  incoming.lockedTips[u] = existingParsed.lockedTips[u];
+                }
+              }
+            }
+          }
+        }
+
+        const merged = JSON.stringify(incoming);
+        await env.TIPPING_KV.put("ms2026_state", merged);
+        // Záloha při každém uložení
+        await env.TIPPING_KV.put("ms2026_backup", merged);
         return new Response('{"ok":true}', { headers: { ...cors, "Content-Type": "application/json" } });
       } catch(e) {
         return new Response('{"error":"invalid json"}', { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
