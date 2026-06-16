@@ -3,6 +3,13 @@ var state = {users:{},tips:{},results:{},champion:{},championLocked:{},lockedTip
 var currentUser = null;
 var saveInProgress = false; // Zabraňuje souběžným zápisům
 
+// Deadline pro výběr šampióna — konec skupinové fáze
+var CHAMPION_DEADLINE = new Date("2026-06-28T02:00:00Z"); // 28.6. 04:00 SEČ = 02:00 UTC
+
+function championDeadlinePassed() {
+  return new Date() > CHAMPION_DEADLINE;
+}
+
 var ALL_TEAMS = [
   ["Algeria","🇩🇿"],["Argentina","🇦🇷"],["Australia","🇦🇺"],["Austria","🇦🇹"],
   ["Belgium","🇧🇪"],["Bosnia and Herzegovina","🇧🇦"],["Bosnia-Herzegovina","🇧🇦"],["Brazil","🇧🇷"],
@@ -216,18 +223,33 @@ function renderChampionPicker() {
   var locked=!!(state.championLocked&&state.championLocked[currentUser]);
   var chosen=state.champion[currentUser];
   var tw=state.tournamentWinner;
-  if(locked&&chosen){
-    var extra=tw
-      ?(chosen===tw?'<span class="badge gold" style="margin-left:10px">+20b 🎉</span>':'<span class="badge miss" style="margin-left:10px">0b</span>')
-      :'<span style="font-size:11px;color:var(--text3);margin-left:10px">🔒 Uzamčeno</span>';
-    wrap.innerHTML='<div class="champion-chosen"><span style="font-size:24px">'+flagFor(chosen)+'</span><span>'+chosen+'</span>'+extra+'</div>';
+  var deadlinePassed=championDeadlinePassed();
+  if((locked&&chosen)||(!chosen&&deadlinePassed)){
+    // Uzamčeno nebo deadline vypršel
+    if(!chosen){
+      // Deadline prošel a nevybral šampióna
+      wrap.innerHTML='<div style="font-size:13px;color:var(--red);padding:8px 0">⏰ Deadline pro výběr šampióna vypršel (28. 6. 04:00). Tip již nelze zadat.</div>';
+    } else {
+      var extra=tw
+        ?(chosen===tw?'<span class="badge gold" style="margin-left:10px">+20b 🎉</span>':' <span class="badge miss" style="margin-left:10px">0b</span>')
+        :'<span style="font-size:11px;color:var(--text3);margin-left:10px">🔒 Uzamčeno</span>';
+      wrap.innerHTML='<div class="champion-chosen"><span style="font-size:24px">'+flagFor(chosen)+'</span><span>'+chosen+'</span>'+extra+'</div>';
+    }
+  } else if(deadlinePassed&&chosen&&!locked){
+    // Vybral ale neuzamkl — deadline prošel, automaticky uzamkni
+    if(!state.championLocked) state.championLocked={};
+    state.championLocked[currentUser]=true;
+    saveState();
+    var extra2=tw?(chosen===tw?'<span class="badge gold" style="margin-left:10px">+20b 🎉</span>':' <span class="badge miss" style="margin-left:10px">0b</span>'):'<span style="font-size:11px;color:var(--text3);margin-left:10px">🔒 Uzamčeno (automaticky)</span>';
+    wrap.innerHTML='<div class="champion-chosen"><span style="font-size:24px">'+flagFor(chosen)+'</span><span>'+chosen+'</span>'+extra2+'</div>';
   } else {
     var opts='<option value="">— Vyber šampióna —</option>';
     for(var i=0;i<ALL_TEAMS.length;i++){
       var tf=ALL_TEAMS[i];
-      opts+='<option value="'+tf[0]+'"'+(tf[0]===chosen?' selected':'')+'>'+tf[1]+' '+tf[0]+'</option>';
+      opts+='<option value="'+tf[0]+'"'+( tf[0]===chosen?' selected':'')+'>'+tf[1]+' '+tf[0]+'</option>';
     }
-    var btn=chosen?'<button class="btn-primary" style="margin-top:10px;font-size:13px;padding:8px" onclick="lockChampion()">🔒 Potvrdit a uzamknout tip</button>':'';
+    var deadlineStr=" · Deadline: 28. 6. 04:00";
+    var btn=chosen?'<button class="btn-primary" style="margin-top:10px;font-size:13px;padding:8px" onclick="lockChampion()">🔒 Potvrdit a uzamknout tip</button>':'<p style="font-size:11px;color:var(--red);margin-top:8px">⚠️ Nezapomeň vybrat a uzamknout šampióna do 28. 6. 04:00!</p>';
     wrap.innerHTML='<select class="champion-select" onchange="previewChampion(this.value)">'+opts+'</select>'+btn;
   }
 }
@@ -239,6 +261,7 @@ function previewChampion(val){
 }
 
 function lockChampion(){
+  if(championDeadlinePassed()){ toast("Deadline pro výběr šampióna již vypršel."); return; }
   var val=state.champion[currentUser];
   if(!val) return;
   if(!confirm('Opravdu uzamknout tip na šampióna "'+val+'"? Toto nelze změnit.')) return;
@@ -415,7 +438,7 @@ function renderLb() {
       +'<div class="lb-rank">'+(i<3?medals[i]:i+1)+'</div>'
       +'<div class="avatar" style="width:34px;height:34px;font-size:12px">'+initials(p.name)+'</div>'
       +'<div style="flex:1;min-width:0"><div class="lb-name">'+p.name+'</div>'
-      +(champ?'<div class="lb-champion">🏆 '+flagFor(champ)+' '+champ+'</div>':'')
+      +(champ?'<div class="lb-champion">🏆 '+flagFor(champ)+' '+champ+'</div>':(!championDeadlinePassed()?'<div class="lb-champion" style="color:var(--red)">⚠️ Nevybral šampióna</div>':'<div class="lb-champion" style="color:var(--text3)">— Bez tipu na šampióna</div>'))
       +'</div>'
       +'<div style="text-align:right"><div class="lb-pts">'+p.pts+'</div><div class="lb-pts-lbl">bodů</div></div>'
       +'</div>';
