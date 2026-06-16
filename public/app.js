@@ -101,6 +101,35 @@ async function saveState() {
   try {
     var userCount = Object.keys(state.users||{}).length;
     if(userCount===0){ console.warn("saveState blocked: no users"); return; }
+    // Klientská pojistka: před zápisem merguj s KV aby nikdy nedošlo ke ztrátě dat
+    try {
+      var check = await fetch("/api/state");
+      if(check.ok){
+        var text = await check.text();
+        if(text && text.trim() !== "" && text.trim() !== "{}"){
+          var kv = JSON.parse(text);
+          var kvCount = Object.keys(kv.users||{}).length;
+          if(kvCount > userCount){
+            // KV má více uživatelů — přidej chybějící do lokálního state
+            for(var u in kv.users){
+              if(!state.users[u]){
+                state.users[u] = kv.users[u];
+                if(kv.tips && kv.tips[u]) state.tips[u] = kv.tips[u];
+                if(kv.champion && kv.champion[u]) state.champion[u] = kv.champion[u];
+                if(kv.championLocked && kv.championLocked[u]){
+                  if(!state.championLocked) state.championLocked={};
+                  state.championLocked[u] = kv.championLocked[u];
+                }
+                if(kv.lockedTips && kv.lockedTips[u]){
+                  if(!state.lockedTips) state.lockedTips={};
+                  state.lockedTips[u] = kv.lockedTips[u];
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch(mergeErr){ console.error("merge check failed",mergeErr); }
     await fetch("/api/state",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
