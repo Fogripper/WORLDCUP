@@ -39,16 +39,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .tab{display:none}.tab.active{display:block}
 .section-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;padding-left:2px}
 .match-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 0;margin-bottom:10px}
-.match-row{display:flex;align-items:center;gap:0;padding:12px 16px}
-.match-row .team-side.home{flex:1;justify-content:flex-end;flex-direction:row-reverse}
-.match-row .center-cell{width:120px;flex-shrink:0;text-align:center}
-.match-row .team-side.away{flex:1;justify-content:flex-start}
+.match-row{display:flex;align-items:center;gap:8px;padding:12px 16px}
 .match-row:not(:last-child){border-bottom:1px solid var(--border)}
-.team-side{display:flex;align-items:center;gap:8px}
+.team-side{display:flex;align-items:center;gap:8px;flex:1}
 .team-side.home{justify-content:flex-end;flex-direction:row-reverse}
-.flag{font-size:22px;line-height:1;flex-shrink:0}
+.team-side.away{justify-content:flex-start;flex-direction:row}
+.flag{font-size:20px;line-height:1;flex-shrink:0}
 .team-name{font-size:13px;font-weight:600}
-.center-cell{text-align:center;min-width:100px}
+.center-cell{width:130px;flex-shrink:0;text-align:center}
 .score-wrap{display:flex;align-items:center;gap:6px;justify-content:center}
 .score-input{width:42px;text-align:center;padding:7px 4px;font-size:17px;font-weight:700;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);outline:none;-moz-appearance:textfield;transition:border-color .2s}
 .score-input::-webkit-inner-spin-button,.score-input::-webkit-outer-spin-button{display:none}
@@ -84,10 +82,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .sync-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .sync-info{font-size:12px;color:var(--text3)}
 .spinning{animation:spin .9s linear infinite;display:inline-block}
-.tip-result-row{display:flex;align-items:center;gap:0;padding:11px 16px}
-.tip-result-row .team-side.home{flex:1;justify-content:flex-end;flex-direction:row-reverse}
-.tip-result-row .tip-center{width:120px;flex-shrink:0;text-align:center}
-.tip-result-row .team-side.away{flex:1;justify-content:flex-start}
+.tip-result-row{display:flex;align-items:center;gap:8px;padding:11px 16px}
+.tip-result-row:not(:last-child){border-bottom:1px solid var(--border)}
+.tip-result-row .team-side{flex:1}
+.tip-result-row .tip-center{width:130px;flex-shrink:0;text-align:center}
 .tip-score{font-size:15px;font-weight:700}
 .tip-center{text-align:center}
 .real-score{font-size:11px;color:var(--text3);margin-top:2px}
@@ -97,6 +95,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;backgrou
 .legend{display:flex;justify-content:center;align-items:center;gap:0;margin-bottom:24px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
 .legend-item{display:flex;align-items:center;gap:12px;padding:14px 20px;flex:1;justify-content:center}
 .legend-icon{font-size:22px;flex-shrink:0}
+.legend-text{flex:1;min-width:0}
 .legend-title{font-size:13px;font-weight:600;color:var(--text)}
 .legend-desc{font-size:11px;color:var(--text3);margin-top:2px}
 .legend-pts{font-size:20px;font-weight:800;color:var(--gold);margin-left:auto;flex-shrink:0}
