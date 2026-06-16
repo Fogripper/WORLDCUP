@@ -336,23 +336,29 @@ function renderOthers() {
       else html+='<span style="font-size:12px;color:var(--text3);margin:0 6px">vs</span>';
       html+='<span style="font-size:13px;font-weight:600">'+m.away+'</span><span class="flag" style="font-size:18px">'+m.awayFlag+'</span>';
       html+='<span style="font-size:11px;color:var(--text3);margin-left:auto">'+m.time+'</span></div>';
-      html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
-      for(var j=0;j<users.length;j++){
-        var u=users[j];
-        var t=state.tips[u]&&state.tips[u][m.id];
-        var tipStr=t&&t.home!==''&&t.away!==''?t.home+':'+t.away:'—';
-        var badge='';
-        if(t&&r&&t.home!==''&&t.away!==''&&r.status==='FINISHED'&&r.home!==null){
-          var th=+t.home,ta=+t.away,rh=+r.home,ra=+r.away;
-          if(th===rh&&ta===ra) badge='exact';
-          else if(winner(th,ta)===winner(rh,ra)) badge='win';
-          else badge='miss';
+      var matchStarted=r&&["FINISHED","IN_PLAY","PAUSED"].indexOf(r.status)>=0;
+      if(!matchStarted){
+        html+='<div style="font-size:12px;color:var(--text3);font-style:italic">Tipy se zobrazí po začátku zápasu</div>';
+      } else {
+        html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        for(var j=0;j<users.length;j++){
+          var u=users[j];
+          var t=state.tips[u]&&state.tips[u][m.id];
+          var tipStr=t&&t.home!==''&&t.away!==''?t.home+':'+t.away:'—';
+          var badge='';
+          if(t&&r&&t.home!==''&&t.away!==''&&r.status==='FINISHED'&&r.home!==null){
+            var th=+t.home,ta=+t.away,rh=+r.home,ra=+r.away;
+            if(th===rh&&ta===ra) badge='exact';
+            else if(winner(th,ta)===winner(rh,ra)) badge='win';
+            else badge='miss';
+          }
+          var bg=badge==='exact'?'var(--green-bg)':badge==='win'?'var(--blue-bg)':'var(--bg3)';
+          var col=badge==='exact'?'var(--green)':badge==='win'?'var(--blue)':'var(--text2)';
+          html+='<div style="display:flex;align-items:center;gap:5px;background:'+bg+';border-radius:20px;padding:3px 10px"><span style="font-size:11px;color:'+col+';font-weight:500">'+u+'</span><span style="font-size:12px;font-weight:700;color:'+col+'">'+tipStr+'</span></div>';
         }
-        var bg=badge==='exact'?'var(--green-bg)':badge==='win'?'var(--blue-bg)':'var(--bg3)';
-        var col=badge==='exact'?'var(--green)':badge==='win'?'var(--blue)':'var(--text2)';
-        html+='<div style="display:flex;align-items:center;gap:5px;background:'+bg+';border-radius:20px;padding:3px 10px"><span style="font-size:11px;color:'+col+';font-weight:500">'+u+'</span><span style="font-size:12px;font-weight:700;color:'+col+'">'+tipStr+'</span></div>';
+        html+='</div>';
       }
-      html+='</div></div>';
+      html+='</div>';
     }
     html+='</div>';
   }
