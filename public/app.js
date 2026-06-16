@@ -14,7 +14,7 @@ var ALL_TEAMS = [
   ["Algeria","🇩🇿"],["Argentina","🇦🇷"],["Australia","🇦🇺"],["Austria","🇦🇹"],
   ["Belgium","🇧🇪"],["Bosnia and Herzegovina","🇧🇦"],["Bosnia-Herzegovina","🇧🇦"],["Brazil","🇧🇷"],
   ["Cameroon","🇨🇲"],["Canada","🇨🇦"],["Cape Verde","🇨🇻"],["Cape Verde Islands","🇨🇻"],
-  ["Chile","🇨🇱"],["China","🇨🇳"],["Colombia","🇨🇴"],["Congo","🇨🇬"],["Congo DR","🇨🇩"],
+  ["Chile","🇨🇱"],["China","🇨🇳"],["Colombia","🇨🇴"],["Congo DR","🇨🇬"],
   ["Costa Rica","🇨🇷"],["Croatia","🇭🇷"],["Curaçao","🇨🇼"],["Czech Republic","🇨🇿"],["Czechia","🇨🇿"],
   ["Denmark","🇩🇰"],["Ecuador","🇪🇨"],["Egypt","🇪🇬"],["England","🏴󠁧󠁢󠁥󠁮󠁧󠁿"],
   ["France","🇫🇷"],["Germany","🇩🇪"],["Ghana","🇬🇭"],["Haiti","🇭🇹"],["Honduras","🇭🇳"],
@@ -145,22 +145,32 @@ async function loadMatches(updateResults) {
   return false;
 }
 
-async function saveState() {
-  // Zabraň souběžným zápisům (race condition)
+async function saveState(showFeedback) {
   if(saveInProgress) return;
   try {
     saveInProgress = true;
     var userCount = Object.keys(state.users||{}).length;
-    if(userCount===0){
-      console.warn("saveState blocked: no users in state");
-      return;
+    if(userCount===0){ console.warn("saveState blocked: no users"); return; }
+    var ok = false;
+    for(var attempt=1; attempt<=3; attempt++) {
+      try {
+        var resp = await fetch("/api/state",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(state)
+        });
+        if(resp.ok){ ok=true; break; }
+      } catch(e) {
+        if(attempt===3) throw e;
+        await new Promise(function(r){ setTimeout(r, 500*attempt); });
+      }
     }
-    await fetch("/api/state",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(state)
-    });
-  } catch(e){ console.error("saveState failed",e); }
+    if(!ok) throw new Error("Server neodpověděl");
+    if(showFeedback) toast("✓ Uloženo");
+  } catch(e){
+    console.error("saveState failed",e);
+    toast("⚠️ Tip se nepodařilo uložit! Zkus to znovu.", 5000);
+  }
   finally { saveInProgress = false; }
 }
 
@@ -267,8 +277,7 @@ function lockChampion(){
   if(!confirm('Opravdu uzamknout tip na šampióna "'+val+'"? Toto nelze změnit.')) return;
   if(!state.championLocked) state.championLocked={};
   state.championLocked[currentUser]=true;
-  saveState(); renderChampionPicker(); refreshPts();
-  toast("🏆 Tip uzamčen: "+val);
+  saveState(true); renderChampionPicker(); refreshPts();
 }
 
 function sortedByDate() {
@@ -368,8 +377,7 @@ function lockTip(mid) {
   if(!state.lockedTips) state.lockedTips={};
   if(!state.lockedTips[currentUser]) state.lockedTips[currentUser]={};
   state.lockedTips[currentUser][mid]=true;
-  saveState(); renderTips();
-  toast("🔒 Tip uzamčen!");
+  saveState(true); renderTips();
 }
 
 function renderMyTips() {
