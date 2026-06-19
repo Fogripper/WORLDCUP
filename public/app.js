@@ -230,54 +230,39 @@ function isTipLocked(mid) {
 
 function renderChampionPicker() {
   var wrap=document.getElementById("champion-picker-wrap");
-  var locked=!!(state.championLocked&&state.championLocked[currentUser]);
   var chosen=state.champion[currentUser];
   var tw=state.tournamentWinner;
   var deadlinePassed=championDeadlinePassed();
-  if((locked&&chosen)||(!chosen&&deadlinePassed)){
-    // Uzamčeno nebo deadline vypršel
-    if(!chosen){
-      // Deadline prošel a nevybral šampióna
+  if(deadlinePassed) {
+    // Deadline vypršel — automaticky uzamkni pokud má výběr
+    if(!chosen) {
       wrap.innerHTML='<div style="font-size:13px;color:var(--red);padding:8px 0">⏰ Deadline pro výběr šampióna vypršel (28. 6. 04:00). Tip již nelze zadat.</div>';
-    } else {
-      var extra=tw
-        ?(chosen===tw?'<span class="badge gold" style="margin-left:10px">+20b 🎉</span>':' <span class="badge miss" style="margin-left:10px">0b</span>')
-        :'<span style="font-size:11px;color:var(--text3);margin-left:10px">🔒 Uzamčeno</span>';
-      wrap.innerHTML='<div class="champion-chosen"><span style="font-size:24px">'+flagFor(chosen)+'</span><span>'+chosen+'</span>'+extra+'</div>';
+      return;
     }
-  } else if(deadlinePassed&&chosen&&!locked){
-    // Vybral ale neuzamkl — deadline prošel, automaticky uzamkni
     if(!state.championLocked) state.championLocked={};
-    state.championLocked[currentUser]=true;
-    saveState();
-    var extra2=tw?(chosen===tw?'<span class="badge gold" style="margin-left:10px">+20b 🎉</span>':' <span class="badge miss" style="margin-left:10px">0b</span>'):'<span style="font-size:11px;color:var(--text3);margin-left:10px">🔒 Uzamčeno (automaticky)</span>';
-    wrap.innerHTML='<div class="champion-chosen"><span style="font-size:24px">'+flagFor(chosen)+'</span><span>'+chosen+'</span>'+extra2+'</div>';
+    if(!state.championLocked[currentUser]) {
+      state.championLocked[currentUser]=true;
+      saveState();
+    }
+    var extra=tw?(chosen===tw?'<span class="badge gold" style="margin-left:10px">+20b 🎉</span>':' <span class="badge miss" style="margin-left:10px">0b</span>'):'<span style="font-size:11px;color:var(--text3);margin-left:10px">🔒 Uzamčeno automaticky</span>';
+    wrap.innerHTML='<div class="champion-chosen"><span style="font-size:24px">'+flagFor(chosen)+'</span><span>'+chosen+'</span>'+extra+'</div>';
   } else {
+    // Před deadlinem — může libovolně měnit
     var opts='<option value="">— Vyber šampióna —</option>';
     for(var i=0;i<ALL_TEAMS.length;i++){
       var tf=ALL_TEAMS[i];
       opts+='<option value="'+tf[0]+'"'+( tf[0]===chosen?' selected':'')+'>'+tf[1]+' '+tf[0]+'</option>';
     }
-    var deadlineStr=" · Deadline: 28. 6. 04:00";
-    var btn=chosen?'<button class="btn-primary" style="margin-top:10px;font-size:13px;padding:8px" onclick="lockChampion()">🔒 Potvrdit a uzamknout tip</button>':'<p style="font-size:11px;color:var(--red);margin-top:8px">⚠️ Nezapomeň vybrat a uzamknout šampióna do 28. 6. 04:00!</p>';
-    wrap.innerHTML='<select class="champion-select" onchange="previewChampion(this.value)">'+opts+'</select>'+btn;
+    var warning=chosen?'':' <p style="font-size:11px;color:var(--red);margin-top:8px">⚠️ Nezapomeň vybrat šampióna do 28. 6. 04:00!</p>';
+    wrap.innerHTML='<select class="champion-select" onchange="saveChampion(this.value)">'+opts+'</select>'+warning;
   }
 }
 
-function previewChampion(val){
-  if(!val) return;
+function saveChampion(val){
+  if(!val||championDeadlinePassed()) return;
   state.champion[currentUser]=val;
-  renderChampionPicker();
-}
-
-function lockChampion(){
-  if(championDeadlinePassed()){ toast("Deadline pro výběr šampióna již vypršel."); return; }
-  var val=state.champion[currentUser];
-  if(!val) return;
-  if(!confirm('Opravdu uzamknout tip na šampióna "'+val+'"? Toto nelze změnit.')) return;
-  if(!state.championLocked) state.championLocked={};
-  state.championLocked[currentUser]=true;
-  saveState(true); renderChampionPicker(); refreshPts();
+  saveState(); renderChampionPicker(); refreshPts();
+  toast("🏆 Šampión uložen: "+val);
 }
 
 function sortedByDate() {
