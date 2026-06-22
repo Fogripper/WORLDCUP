@@ -115,6 +115,31 @@ export default {
       return new Response('{"ok":true}', { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
+    // --- API: log čtení ---
+    if (url.pathname === "/api/log" && request.method === "GET") {
+      const secret = url.searchParams.get("secret");
+      if (secret !== env.ADMIN_SECRET) return new Response("forbidden", { status: 403 });
+      const log = await env.TIPPING_KV.get("ms2026_log");
+      return new Response(log || "[]", { headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
+    // --- API: log zápis ---
+    if (url.pathname === "/api/log" && request.method === "POST") {
+      const body = await request.text();
+      try {
+        const entries = JSON.parse(body);
+        // Načti existující log a přidej nové záznamy
+        const existing = await env.TIPPING_KV.get("ms2026_log");
+        let log = existing ? JSON.parse(existing) : [];
+        log = entries.concat(log);
+        if (log.length > 2000) log = log.slice(0, 2000);
+        await env.TIPPING_KV.put("ms2026_log", JSON.stringify(log));
+        return new Response('{"ok":true}', { headers: { ...cors, "Content-Type": "application/json" } });
+      } catch(e) {
+        return new Response('{"error":"invalid json"}', { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
+      }
+    }
+
     // --- Vše ostatní: 404 (frontend je na Pages) ---
     return new Response("Not found", { status: 404 });
   },
