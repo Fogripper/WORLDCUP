@@ -3,35 +3,28 @@ var state = {users:{},tips:{},results:{},champion:{},championLocked:{},lockedTip
 var currentUser = null;
 var saveInProgress = false; // Zabraňuje souběžným zápisům
 
-// --- Logování ---
-var LOG_KEY = "ms2026_log";
-var MAX_LOG = 200;
+// --- Logování do KV ---
+var logBuffer = [];
+var logFlushTimer = null;
 
 function logEvent(type, detail) {
   try {
-    var entry = { t: new Date().toISOString(), u: currentUser||"?", type: type, detail: detail||"" };
-    var existing = [];
-    try { var raw = localStorage.getItem(LOG_KEY); if(raw) existing = JSON.parse(raw); } catch(e) {}
-    existing.unshift(entry);
-    if(existing.length > MAX_LOG) existing = existing.slice(0, MAX_LOG);
-    localStorage.setItem(LOG_KEY, JSON.stringify(existing));
+    logBuffer.push({ t: new Date().toISOString(), u: currentUser||"?", type: type, detail: detail||"" });
+    // Flush do KV po 3 sekundách nečinnosti (batch aby nevznikalo příliš requestů)
+    if(logFlushTimer) clearTimeout(logFlushTimer);
+    logFlushTimer = setTimeout(flushLog, 3000);
   } catch(e) {}
 }
 
-function showLog() {
-  var log = [];
-  try { var raw = localStorage.getItem(LOG_KEY); if(raw) log = JSON.parse(raw); } catch(e) {}
-  var win = window.open("","_blank","width=900,height=600");
-  var rows = log.map(function(e){
-    var cls = e.type.indexOf("OK")>=0?"color:#4f4":e.type.indexOf("ERR")>=0?"color:#f44":e.type.indexOf("lock")>=0?"color:#fa0":e.type.indexOf("login")>=0?"color:#8cf":e.type.indexOf("sync")>=0?"color:#c8f":"color:#fc8";
-    return "<tr><td style='color:#888;white-space:nowrap;padding:2px 8px'>"+e.t.replace("T"," ").slice(0,19)+"</td><td style='color:#7cf;padding:2px 8px'>"+e.u+"</td><td style='"+cls+";padding:2px 8px'>"+e.type+"</td><td style='color:#ccc;padding:2px 8px'>"+e.detail+"</td></tr>";
-  }).join("");
-  win.document.write("<html><head><title>Log</title></head><body style='background:#111;color:#eee;font-family:monospace;font-size:12px;padding:10px'><h3>MS 2026 Log ("+log.length+" záznamů) <button onclick='window.location.reload()'>↻</button> <button onclick='window.opener.clearLog()'>Smazat</button></h3><table style='width:100%;border-collapse:collapse'><tr><th style='text-align:left;color:#555'>Čas</th><th style='text-align:left;color:#555'>Hráč</th><th style='text-align:left;color:#555'>Událost</th><th style='text-align:left;color:#555'>Detail</th></tr>"+rows+"</table></body></html>");
-  win.document.close();
-}
-
-function clearLog() {
-  try { localStorage.removeItem(LOG_KEY); toast("Log smazán"); } catch(e) {}
+function flushLog() {
+  if(!logBuffer.length) return;
+  var entries = logBuffer.slice();
+  logBuffer = [];
+  fetch("/api/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entries)
+  }).catch(function(){});
 }
 
 
