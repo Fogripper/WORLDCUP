@@ -51,10 +51,45 @@ export default {
       });
     }
 
-    // --- API: stav (čtení) ---
+    // --- API: stav (čtení) s automatickou kontrolou integrity ---
     if (url.pathname === "/api/state" && request.method === "GET") {
       const value = await env.TIPPING_KV.get("ms2026_state");
-      return new Response(value || "{}", { headers: { ...cors, "Content-Type": "application/json" } });
+      if (!value) return new Response("{}", { headers: { ...cors, "Content-Type": "application/json" } });
+      
+      const state = JSON.parse(value);
+      let changed = false;
+      
+      // Automatická kontrola — pokud hráč má v backupu více tipů, obnov
+      for (const user in (state.users || {})) {
+        const backupRaw = await env.TIPPING_KV.get("user_backup:" + user);
+        if (!backupRaw) continue;
+        const backup = JSON.parse(backupRaw);
+        const currentCount = Object.keys((state.tips && state.tips[user]) || {}).length;
+        const backupCount = Object.keys(backup.tips || {}).length;
+        
+        if (backupCount > currentCount) {
+          if (!state.tips) state.tips = {};
+          if (!state.tips[user]) state.tips[user] = {};
+          if (!state.lockedTips) state.lockedTips = {};
+          if (!state.lockedTips[user]) state.lockedTips[user] = {};
+          for (const mid in backup.tips) {
+            if (!state.tips[user][mid]) state.tips[user][mid] = backup.tips[mid];
+          }
+          for (const mid in backup.lockedTips) {
+            if (!state.lockedTips[user][mid]) state.lockedTips[user][mid] = backup.lockedTips[mid];
+          }
+          changed = true;
+        }
+      }
+      
+      if (changed) {
+        const merged = JSON.stringify(state);
+        await env.TIPPING_KV.put("ms2026_state", merged);
+        await env.TIPPING_KV.put("ms2026_backup", merged);
+        return new Response(merged, { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+      
+      return new Response(value, { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
     // --- API: stav (zápis) ---
@@ -91,8 +126,20 @@ export default {
 
         const merged = JSON.stringify(incoming);
         await env.TIPPING_KV.put("ms2026_state", merged);
-        // Záloha při každém uložení
+        // Záloha celého stavu
         await env.TIPPING_KV.put("ms2026_backup", merged);
+        // Per-user backup tipů — ukládáme snapshot každého hráče zvlášť
+        if (incoming.tips) {
+          for (const user in incoming.tips) {
+            const userSnapshot = {
+              tips: incoming.tips[user] || {},
+              lockedTips: (incoming.lockedTips && incoming.lockedTips[user]) || {},
+              champion: incoming.champion && incoming.champion[user] || null,
+              savedAt: new Date().toISOString()
+            };
+            await env.TIPPING_KV.put("user_backup:" + user, JSON.stringify(userSnapshot));
+          }
+        }
         return new Response('{"ok":true}', { headers: { ...cors, "Content-Type": "application/json" } });
       } catch(e) {
         return new Response('{"error":"invalid json"}', { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
@@ -132,12 +179,94 @@ export default {
         const existing = await env.TIPPING_KV.get("ms2026_log");
         let log = existing ? JSON.parse(existing) : [];
         log = entries.concat(log);
-        if (log.length > 10000) log = log.slice(0, 10000);
+        if (log.length > 5000) log = log.slice(0, 5000);
         await env.TIPPING_KV.put("ms2026_log", JSON.stringify(log));
         return new Response('{"ok":true}', { headers: { ...cors, "Content-Type": "application/json" } });
       } catch(e) {
         return new Response('{"error":"invalid json"}', { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
       }
+    }
+
+    // --- API: automatická obnova chybějících tipů ---
+    if (url.pathname === "/api/restore" && request.method === "POST") {
+      const body = await request.json();
+      if (body.secret !== env.ADMIN_SECRET) return new Response('{"error":"forbidden"}', { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
+      
+      const stateRaw = await env.TIPPING_KV.get("ms2026_state");
+      if (!stateRaw) return new Response('{"error":"no state"}', { status: 404, headers: { ...cors, "Content-Type": "application/json" } });
+      const state = JSON.parse(stateRaw);
+      
+      let restored = [];
+      let changed = false;
+      
+      // Pro každého hráče zkontroluj jeho backup
+      for (const user in state.users) {
+        const backupRaw = await env.TIPPING_KV.get("user_backup:" + user);
+        if (!backupRaw) continue;
+        const backup = JSON.parse(backupRaw);
+        
+        const currentTipCount = Object.keys((state.tips && state.tips[user]) || {}).length;
+        const backupTipCount = Object.keys(backup.tips || {}).length;
+        
+        if (backupTipCount > currentTipCount) {
+          // Hráč má v backupu více tipů — obnov chybějící
+          if (!state.tips) state.tips = {};
+          if (!state.tips[user]) state.tips[user] = {};
+          if (!state.lockedTips) state.lockedTips = {};
+          if (!state.lockedTips[user]) state.lockedTips[user] = {};
+          
+          let restoredCount = 0;
+          for (const mid in backup.tips) {
+            if (!state.tips[user][mid]) {
+              state.tips[user][mid] = backup.tips[mid];
+              restoredCount++;
+            }
+          }
+          for (const mid in backup.lockedTips) {
+            if (!state.lockedTips[user][mid]) {
+              state.lockedTips[user][mid] = backup.lockedTips[mid];
+            }
+          }
+          
+          restored.push({ user, restoredCount, backupTipCount, currentTipCount, backupSavedAt: backup.savedAt });
+          changed = true;
+        }
+      }
+      
+      if (changed) {
+        const merged = JSON.stringify(state);
+        await env.TIPPING_KV.put("ms2026_state", merged);
+        await env.TIPPING_KV.put("ms2026_backup", merged);
+      }
+      
+      return new Response(JSON.stringify({ ok: true, changed, restored }), {
+        headers: { ...cors, "Content-Type": "application/json" }
+      });
+    }
+
+    // --- API: stav per-user backupů ---
+    if (url.pathname === "/api/backup-status" && request.method === "GET") {
+      const secret = url.searchParams.get("secret");
+      if (secret !== env.ADMIN_SECRET) return new Response("forbidden", { status: 403 });
+      
+      const stateRaw = await env.TIPPING_KV.get("ms2026_state");
+      const state = stateRaw ? JSON.parse(stateRaw) : { users: {} };
+      
+      const status = [];
+      for (const user in state.users) {
+        const backupRaw = await env.TIPPING_KV.get("user_backup:" + user);
+        const backup = backupRaw ? JSON.parse(backupRaw) : null;
+        status.push({
+          user,
+          currentTips: Object.keys((state.tips && state.tips[user]) || {}).length,
+          backupTips: backup ? Object.keys(backup.tips || {}).length : 0,
+          backupSavedAt: backup ? backup.savedAt : null,
+          needsRestore: backup ? Object.keys(backup.tips||{}).length > Object.keys((state.tips&&state.tips[user])||{}).length : false
+        });
+      }
+      return new Response(JSON.stringify(status, null, 2), {
+        headers: { ...cors, "Content-Type": "application/json" }
+      });
     }
 
     // --- Vše ostatní: 404 (frontend je na Pages) ---
