@@ -132,7 +132,7 @@ export default {
         const existing = await env.TIPPING_KV.get("ms2026_log");
         let log = existing ? JSON.parse(existing) : [];
         log = entries.concat(log);
-        if (log.length > 2000) log = log.slice(0, 2000);
+        if (log.length > 10000) log = log.slice(0, 10000);
         await env.TIPPING_KV.put("ms2026_log", JSON.stringify(log));
         return new Response('{"ok":true}', { headers: { ...cors, "Content-Type": "application/json" } });
       } catch(e) {
