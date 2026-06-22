@@ -3,6 +3,38 @@ var state = {users:{},tips:{},results:{},champion:{},championLocked:{},lockedTip
 var currentUser = null;
 var saveInProgress = false; // Zabraňuje souběžným zápisům
 
+// --- Logování ---
+var LOG_KEY = "ms2026_log";
+var MAX_LOG = 200;
+
+function logEvent(type, detail) {
+  try {
+    var entry = { t: new Date().toISOString(), u: currentUser||"?", type: type, detail: detail||"" };
+    var existing = [];
+    try { var raw = localStorage.getItem(LOG_KEY); if(raw) existing = JSON.parse(raw); } catch(e) {}
+    existing.unshift(entry);
+    if(existing.length > MAX_LOG) existing = existing.slice(0, MAX_LOG);
+    localStorage.setItem(LOG_KEY, JSON.stringify(existing));
+  } catch(e) {}
+}
+
+function showLog() {
+  var log = [];
+  try { var raw = localStorage.getItem(LOG_KEY); if(raw) log = JSON.parse(raw); } catch(e) {}
+  var win = window.open("","_blank","width=900,height=600");
+  var rows = log.map(function(e){
+    var cls = e.type.indexOf("OK")>=0?"color:#4f4":e.type.indexOf("ERR")>=0?"color:#f44":e.type.indexOf("lock")>=0?"color:#fa0":e.type.indexOf("login")>=0?"color:#8cf":e.type.indexOf("sync")>=0?"color:#c8f":"color:#fc8";
+    return "<tr><td style='color:#888;white-space:nowrap;padding:2px 8px'>"+e.t.replace("T"," ").slice(0,19)+"</td><td style='color:#7cf;padding:2px 8px'>"+e.u+"</td><td style='"+cls+";padding:2px 8px'>"+e.type+"</td><td style='color:#ccc;padding:2px 8px'>"+e.detail+"</td></tr>";
+  }).join("");
+  win.document.write("<html><head><title>Log</title></head><body style='background:#111;color:#eee;font-family:monospace;font-size:12px;padding:10px'><h3>MS 2026 Log ("+log.length+" záznamů) <button onclick='window.location.reload()'>↻</button> <button onclick='window.opener.clearLog()'>Smazat</button></h3><table style='width:100%;border-collapse:collapse'><tr><th style='text-align:left;color:#555'>Čas</th><th style='text-align:left;color:#555'>Hráč</th><th style='text-align:left;color:#555'>Událost</th><th style='text-align:left;color:#555'>Detail</th></tr>"+rows+"</table></body></html>");
+  win.document.close();
+}
+
+function clearLog() {
+  try { localStorage.removeItem(LOG_KEY); toast("Log smazán"); } catch(e) {}
+}
+
+
 // Deadline pro výběr šampióna — konec skupinové fáze
 var CHAMPION_DEADLINE = new Date("2026-06-28T02:00:00Z"); // 28.6. 04:00 SEČ = 02:00 UTC
 
@@ -92,6 +124,7 @@ function mergeKvIntoState(kv) {
 
 async function loadState() {
   try {
+    logEvent("loadState-start","");
     var r = await fetch("/api/state");
     if(r.ok){
       var text = await r.text();
@@ -146,11 +179,12 @@ async function loadMatches(updateResults) {
 }
 
 async function saveState(showFeedback) {
-  if(saveInProgress) return;
+  if(saveInProgress) { logEvent("save-skip","already in progress"); return; }
   try {
     saveInProgress = true;
     var userCount = Object.keys(state.users||{}).length;
-    if(userCount===0){ console.warn("saveState blocked: no users"); return; }
+    if(userCount===0){ logEvent("save-BLOCKED","no users in state"); console.warn("saveState blocked: no users"); return; }
+    logEvent("save-start","users:"+userCount);
     var ok = false;
     for(var attempt=1; attempt<=3; attempt++) {
       try {
@@ -160,14 +194,18 @@ async function saveState(showFeedback) {
           body:JSON.stringify(state)
         });
         if(resp.ok){ ok=true; break; }
+        logEvent("save-retry","attempt "+attempt+" status:"+resp.status);
       } catch(e) {
+        logEvent("save-retry","attempt "+attempt+" err:"+e.message);
         if(attempt===3) throw e;
         await new Promise(function(r){ setTimeout(r, 500*attempt); });
       }
     }
     if(!ok) throw new Error("Server neodpověděl");
+    logEvent("save-OK","users:"+userCount);
     if(showFeedback) toast("✓ Uloženo");
   } catch(e){
+    logEvent("save-ERR",e.message);
     console.error("saveState failed",e);
     toast("⚠️ Tip se nepodařilo uložit! Zkus to znovu.", 5000);
   }
@@ -180,6 +218,7 @@ function enterApp(n) {
   currentUser = n;
   try{ localStorage.setItem("ms2026_user",n); }catch(e){}
   if(isNew) saveState();
+  logEvent("login","user:"+n+" isNew:"+isNew);
   document.getElementById("login-screen").style.display="none";
   document.getElementById("main-screen").style.display="block";
   document.getElementById("u-name").textContent=n;
@@ -348,10 +387,11 @@ function renderTips() {
 }
 
 function saveTip(el,mid,side) {
-  if(!currentUser||isTipLocked(mid)) return;
+  if(!currentUser||isTipLocked(mid)) { logEvent("tip-blocked",mid+" "+side); return; }
   if(!state.tips[currentUser]) state.tips[currentUser]={};
   if(!state.tips[currentUser][mid]) state.tips[currentUser][mid]={home:"",away:""};
   state.tips[currentUser][mid][side]=el.value;
+  logEvent("tip-set",mid+" "+side+"="+el.value);
   saveState();
 }
 
@@ -362,6 +402,7 @@ function lockTip(mid) {
   if(!state.lockedTips) state.lockedTips={};
   if(!state.lockedTips[currentUser]) state.lockedTips[currentUser]={};
   state.lockedTips[currentUser][mid]=true;
+  logEvent("lock-tip",mid+" "+t.home+":"+t.away);
   saveState(true); renderTips();
 }
 
@@ -505,6 +546,7 @@ async function syncResults() {
   var icon=document.getElementById("sync-icon"), info=document.getElementById("sync-info");
   icon.classList.add("spinning"); info.textContent="Načítám...";
   try {
+    logEvent("sync-start","");
     await loadMatches(true);
     var now=new Date().toLocaleTimeString("cs",{hour:"2-digit",minute:"2-digit"});
     state.lastSync=now;
