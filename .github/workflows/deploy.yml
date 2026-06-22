@@ -12,8 +12,73 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 1. Záloha před deployem
+      - name: Backup KV data before deploy
+        run: |
+          RESPONSE=$(curl -s "https://ms2026-tipping.valapavel99.workers.dev/api/state")
+          echo "$RESPONSE" > kv_backup.json
+          USERS=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('users',{})))" 2>/dev/null || echo "0")
+          echo "Backup: $USERS hráčů, $(wc -c < kv_backup.json) bytes"
+          echo "BACKUP_USERS=$USERS" >> $GITHUB_ENV
+
+      # 2. Ulož zálohu jako artifact
+      - name: Upload KV backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kv-backup-${{ github.sha }}
+          path: kv_backup.json
+          retention-days: 90
+
+      # 3. Deploy
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
+
+      # 4. Počkej až se Worker propaguje
+      - name: Wait for Worker propagation
+        run: sleep 10
+
+      # 5. Zkontroluj KV po deployi
+      - name: Verify KV data after deploy
+        run: |
+          RESPONSE=$(curl -s "https://ms2026-tipping.valapavel99.workers.dev/api/state")
+          USERS_AFTER=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('users',{})))" 2>/dev/null || echo "0")
+          echo "Po deployi: $USERS_AFTER hráčů (před deployem: $BACKUP_USERS)"
+          echo "USERS_AFTER=$USERS_AFTER" >> $GITHUB_ENV
+          if [ "$USERS_AFTER" -lt "$BACKUP_USERS" ]; then
+            echo "⚠️ KV má méně hráčů po deployi! Spouštím obnovu..."
+            echo "NEEDS_RESTORE=true" >> $GITHUB_ENV
+          else
+            echo "✅ KV data jsou v pořádku"
+            echo "NEEDS_RESTORE=false" >> $GITHUB_ENV
+          fi
+
+      # 6. Obnov zálohu pokud je potřeba
+      - name: Restore KV backup if needed
+        if: env.NEEDS_RESTORE == 'true'
+        run: |
+          echo "Obnovuji zálohu ($BACKUP_USERS hráčů)..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "https://ms2026-tipping.valapavel99.workers.dev/api/state" \
+            -H "Content-Type: application/json" \
+            -d @kv_backup.json)
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Záloha úspěšně obnovena!"
+          else
+            echo "❌ Obnova selhala (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+
+      # 7. Finální ověření
+      - name: Final verification
+        run: |
+          RESPONSE=$(curl -s "https://ms2026-tipping.valapavel99.workers.dev/api/state")
+          USERS_FINAL=$(echo "$RESPONSE" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('users',{})))" 2>/dev/null || echo "0")
+          echo "Finální stav: $USERS_FINAL hráčů"
+          if [ "$USERS_FINAL" -lt "$BACKUP_USERS" ]; then
+            echo "❌ KV data stále nekompletní!"
+            exit 1
+          fi
+          echo "✅ Deploy dokončen, data v pořádku ($USERS_FINAL hráčů)"
