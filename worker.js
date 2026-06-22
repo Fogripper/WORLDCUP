@@ -99,27 +99,46 @@ export default {
         const incoming = JSON.parse(body);
         const incomingUsers = Object.keys(incoming.users || {}).length;
 
-        // Ochrana: nikdy nezapiš pokud by to smazalo uživatele
+        // Tip-level merge — nikdy nezapiš méně tipů než je v KV
         const existing = await env.TIPPING_KV.get("ms2026_state");
         if (existing) {
-          const existingParsed = JSON.parse(existing);
-          const existingUsers = Object.keys(existingParsed.users || {}).length;
-          if (incomingUsers < existingUsers) {
-            // Merge - zachovej uživatele z KV kteří chybí v příchozím stavu
-            for (const u in existingParsed.users) {
-              if (!incoming.users[u]) {
-                incoming.users[u] = existingParsed.users[u];
-                if (existingParsed.tips[u]) incoming.tips[u] = existingParsed.tips[u];
-                if (existingParsed.champion[u]) incoming.champion[u] = existingParsed.champion[u];
-                if (existingParsed.championLocked?.[u]) {
-                  if (!incoming.championLocked) incoming.championLocked = {};
-                  incoming.championLocked[u] = existingParsed.championLocked[u];
-                }
-                if (existingParsed.lockedTips?.[u]) {
-                  if (!incoming.lockedTips) incoming.lockedTips = {};
-                  incoming.lockedTips[u] = existingParsed.lockedTips[u];
-                }
+          const kv = JSON.parse(existing);
+          
+          // 1. Zachovej uživatele kteří chybí v příchozím stavu
+          for (const u in (kv.users || {})) {
+            if (!incoming.users[u]) {
+              incoming.users[u] = kv.users[u];
+            }
+          }
+          
+          // 2. Tip-level merge — pro každého hráče zachovej každý tip který existuje v KV
+          for (const u in (kv.tips || {})) {
+            if (!incoming.tips) incoming.tips = {};
+            if (!incoming.tips[u]) incoming.tips[u] = {};
+            for (const mid in kv.tips[u]) {
+              // Zachovej tip z KV pokud příchozí stav ho nemá
+              if (!incoming.tips[u][mid]) {
+                incoming.tips[u][mid] = kv.tips[u][mid];
               }
+            }
+          }
+          
+          // 3. Zachovej lockedTips z KV — uzamčený tip nelze oduzamknout
+          for (const u in (kv.lockedTips || {})) {
+            if (!incoming.lockedTips) incoming.lockedTips = {};
+            if (!incoming.lockedTips[u]) incoming.lockedTips[u] = {};
+            for (const mid in kv.lockedTips[u]) {
+              if (!incoming.lockedTips[u][mid]) {
+                incoming.lockedTips[u][mid] = kv.lockedTips[u][mid];
+              }
+            }
+          }
+          
+          // 4. Zachovej šampióny z KV
+          for (const u in (kv.champion || {})) {
+            if (!incoming.champion) incoming.champion = {};
+            if (!incoming.champion[u] && kv.champion[u]) {
+              incoming.champion[u] = kv.champion[u];
             }
           }
         }
