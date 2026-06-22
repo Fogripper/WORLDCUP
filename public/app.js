@@ -2,6 +2,16 @@ var MATCHES = [];
 var state = {users:{},tips:{},results:{},champion:{},championLocked:{},lockedTips:{},tournamentWinner:null,lastSync:null};
 var currentUser = null;
 var saveInProgress = false; // Zabraňuje souběžným zápisům
+var pendingSave = false; // Čeká se na uložení
+
+// Varování při zavření stránky pokud se tip ještě ukládá
+window.addEventListener("beforeunload", function(e) {
+  if(pendingSave || saveInProgress) {
+    e.preventDefault();
+    e.returnValue = "Tip se ještě ukládá, počkej chvíli!";
+    return e.returnValue;
+  }
+});
 
 // --- Logování do KV ---
 var logBuffer = [];
@@ -177,6 +187,7 @@ async function saveState(showFeedback) {
     saveInProgress = true;
     var userCount = Object.keys(state.users||{}).length;
     if(userCount===0){ logEvent("save-BLOCKED","no users in state"); console.warn("saveState blocked: no users"); return; }
+    pendingSave = true;
     logEvent("save-start","users:"+userCount);
     var ok = false;
     for(var attempt=1; attempt<=3; attempt++) {
@@ -195,9 +206,11 @@ async function saveState(showFeedback) {
       }
     }
     if(!ok) throw new Error("Server neodpověděl");
+    pendingSave = false;
     logEvent("save-OK","users:"+userCount);
     if(showFeedback) toast("✓ Uloženo");
   } catch(e){
+    pendingSave = false;
     logEvent("save-ERR",e.message);
     console.error("saveState failed",e);
     toast("⚠️ Tip se nepodařilo uložit! Zkus to znovu.", 5000);
