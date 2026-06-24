@@ -556,7 +556,7 @@ function renderOthers() {
             border='';
           }
           html+='<div style="display:flex;align-items:center;gap:5px;background:'+bg+';'+border+'border-radius:20px;padding:3px 10px">'
-            +'<span style="font-size:11px;color:'+col+';font-weight:'+(isMe?'700':'500')+">">'+u+'</span>'
+            +'<span style="font-size:11px;color:'+col+';font-weight:'+(isMe?'700':'500')+'">'+u+'</span>'
             +'<span style="font-size:12px;font-weight:700;color:'+col+'">'+tipStr+'</span>'
             +'</div>';
         }
