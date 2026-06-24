@@ -488,9 +488,11 @@ function renderLb() {
 }
 
 function renderOthers() {
-  var users=Object.keys(state.users).filter(function(u){ return u!==currentUser; });
-  if(!users.length){
-    document.getElementById("others-container").innerHTML='<p style="font-size:13px;color:var(--text2);text-align:center;padding:20px">Zatím nikdo jiný netipoval.</p>';
+  // Všichni hráči — aktuální uživatel první
+  var others=Object.keys(state.users).filter(function(u){ return u!==currentUser; });
+  var allUsers = currentUser ? [currentUser].concat(others) : others;
+  if(!allUsers.length){
+    document.getElementById("others-container").innerHTML='<p style="font-size:13px;color:var(--text2);text-align:center;padding:20px">Zatím nikdo netipoval.</p>';
     return;
   }
   var grouped=groupByDay(sortedByDate());
@@ -516,11 +518,21 @@ function renderOthers() {
         +'<span style="font-size:11px;color:var(--text3);margin-left:auto">'+m.time+'</span>'
         +'</div>';
       if(!matchStarted){
-        html+='<div style="font-size:12px;color:var(--text3);font-style:italic">Tipy se zobrazí po začátku zápasu</div>';
+        // Před začátkem zápasu zobrazíme jen tip aktuálního uživatele
+        var myT=state.tips[currentUser]&&state.tips[currentUser][m.id];
+        var myStr=(myT&&myT.home!==''&&myT.away!=='')?myT.home+':'+myT.away:'—';
+        html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        html+='<div style="display:flex;align-items:center;gap:5px;background:rgba(79,110,247,0.15);border:1px solid rgba(79,110,247,0.35);border-radius:20px;padding:3px 10px">'
+          +'<span style="font-size:11px;color:var(--accent);font-weight:700">'+currentUser+'</span>'
+          +'<span style="font-size:12px;font-weight:700;color:var(--accent)">'+myStr+'</span>'
+          +'</div>';
+        html+='<div style="font-size:12px;color:var(--text3);font-style:italic;align-self:center">Ostatní tipy se zobrazí po začátku zápasu</div>';
+        html+='</div>';
       } else {
         html+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
-        for(var j=0;j<users.length;j++){
-          var u=users[j];
+        for(var j=0;j<allUsers.length;j++){
+          var u=allUsers[j];
+          var isMe = u===currentUser;
           var t=state.tips[u]&&state.tips[u][m.id];
           var tipStr=(t&&t.home!==''&&t.away!=='')?t.home+':'+t.away:'—';
           var badge='';
@@ -532,10 +544,19 @@ function renderOthers() {
               else badge='miss';
             }
           }
-          var bg=badge==='exact'?'var(--green-bg)':badge==='win'?'var(--blue-bg)':'var(--bg3)';
-          var col=badge==='exact'?'var(--green)':badge==='win'?'var(--blue)':'var(--text2)';
-          html+='<div style="display:flex;align-items:center;gap:5px;background:'+bg+';border-radius:20px;padding:3px 10px">'
-            +'<span style="font-size:11px;color:'+col+';font-weight:500">'+u+'</span>'
+          var bg,col,border;
+          if(isMe){
+            // Aktuální uživatel — zvýrazněný modře
+            bg=badge==='exact'?'var(--green-bg)':badge==='win'?'var(--blue-bg)':'rgba(79,110,247,0.15)';
+            col=badge==='exact'?'var(--green)':badge==='win'?'var(--blue)':'var(--accent)';
+            border='border:1px solid '+(badge==='exact'?'rgba(34,197,94,0.3)':badge==='win'?'rgba(96,165,250,0.3)':'rgba(79,110,247,0.35)')+';';
+          } else {
+            bg=badge==='exact'?'var(--green-bg)':badge==='win'?'var(--blue-bg)':'var(--bg3)';
+            col=badge==='exact'?'var(--green)':badge==='win'?'var(--blue)':'var(--text2)';
+            border='';
+          }
+          html+='<div style="display:flex;align-items:center;gap:5px;background:'+bg+';'+border+'border-radius:20px;padding:3px 10px">'
+            +'<span style="font-size:11px;color:'+col+';font-weight:'+(isMe?'700':'500')+">">'+u+'</span>'
             +'<span style="font-size:12px;font-weight:700;color:'+col+'">'+tipStr+'</span>'
             +'</div>';
         }
