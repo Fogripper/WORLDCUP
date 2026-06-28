@@ -25,7 +25,7 @@ export default {
 
     // --- API: zápasy ---
     if (url.pathname === "/api/matches") {
-      const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
+      const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches", {
         headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
       });
       if (!resp.ok) return new Response(JSON.stringify({ error: "API error" }), { status: resp.status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -38,6 +38,7 @@ export default {
           id: "m" + m.id, home: h, away: a,
           homeFlag: FLAGS[h] || "🏳️", awayFlag: FLAGS[a] || "🏳️",
           group: (m.group || "").replace("GROUP_", ""),
+          stage: m.stage || "GROUP_STAGE",
           date: d.toLocaleDateString("cs", { day: "numeric", month: "numeric", timeZone: "Europe/Prague" }),
           time: d.toLocaleTimeString("cs", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Prague" }),
           status: m.status,
@@ -294,7 +295,7 @@ export default {
 
   async scheduled(event, env, ctx) {
     try {
-      const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches?stage=GROUP_STAGE", {
+      const resp = await fetch("https://api.football-data.org/v4/competitions/2000/matches", {
         headers: { "X-Auth-Token": env.FOOTBALL_API_TOKEN },
       });
       if (!resp.ok) return;
