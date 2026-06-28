@@ -358,14 +358,19 @@ function saveChampion(val){
 }
 
 function parseMatchDate(m) {
-  // date format: "28. 6." or "1. 7." — parse to sortable number
-  var parts = m.date.replace(/\s/g,"").split(".");
-  var day = parseInt(parts[0],10);
-  var mon = parseInt(parts[1],10);
+  // date format: "28. 6." or "1. 7."
+  var parts = m.date.trim().split(".");
+  var day = parseInt(parts[0].trim(), 10);
+  var mon = parseInt(parts[1].trim(), 10);
   var timeParts = m.time.split(":");
-  var hour = parseInt(timeParts[0],10);
-  var min = parseInt(timeParts[1],10);
-  return mon*100000 + day*1000 + hour*60 + min;
+  var hour = parseInt(timeParts[0], 10);
+  var min = parseInt(timeParts[1], 10);
+  // Turnaj je červen-červenec 2026 — měsíc 7 musí být AŽ po měsíci 6
+  // Přepočet: červen = 6, červenec = 7 ale přidáme rok offset
+  // Jednoduše: pokud měsíc < 6, je to "příští rok" — ale v praxi máme jen 6 a 7
+  // Seřadíme jako: (měsíc == 7 ? 106 : 6) * 10000 + den * 100 + hodina
+  var monthSort = mon === 7 ? 107 : mon;
+  return monthSort * 10000000 + day * 100000 + hour * 100 + min;
 }
 
 function sortedByDate() {
