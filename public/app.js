@@ -357,10 +357,20 @@ function saveChampion(val){
   toast("🏆 Šampión uložen: "+val);
 }
 
+function parseMatchDate(m) {
+  // date format: "28. 6." or "1. 7." — parse to sortable number
+  var parts = m.date.replace(/\s/g,"").split(".");
+  var day = parseInt(parts[0],10);
+  var mon = parseInt(parts[1],10);
+  var timeParts = m.time.split(":");
+  var hour = parseInt(timeParts[0],10);
+  var min = parseInt(timeParts[1],10);
+  return mon*100000 + day*1000 + hour*60 + min;
+}
+
 function sortedByDate() {
   return MATCHES.slice().sort(function(a,b){
-    var da=a.date+" "+a.time, db=b.date+" "+b.time;
-    return da<db?-1:da>db?1:0;
+    return parseMatchDate(a) - parseMatchDate(b);
   });
 }
 
