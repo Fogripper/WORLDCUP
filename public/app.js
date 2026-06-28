@@ -398,7 +398,7 @@ function renderTips() {
   }
   var tips=state.tips[currentUser]||{};
   var stageMatches=matchesForStage(currentStage);
-  var grouped=groupByDay(stageMatches.slice().sort(function(a,b){ var da=a.date+" "+a.time,db=b.date+" "+b.time; return da<db?-1:da>db?1:0; }));
+  var grouped=groupByDay(stageMatches.slice().sort(function(a,b){ return parseMatchDate(a)-parseMatchDate(b); }));
   var selector=renderStageSelector("tips");
   document.getElementById("tips-stage-selector").innerHTML=selector;
   var html="";
@@ -501,7 +501,7 @@ function renderMyTips() {
     +'<div class="metric"><div class="metric-val">'+p.exact+'</div><div class="metric-lbl">Přesný výsledek</div></div>'
     +'</div>'+champSection;
   var stageMatchesMy=matchesForStage(currentStage);
-  var grouped=groupByDay(stageMatchesMy.slice().sort(function(a,b){ var da=a.date+" "+a.time,db=b.date+" "+b.time; return da<db?-1:da>db?1:0; }));
+  var grouped=groupByDay(stageMatchesMy.slice().sort(function(a,b){ return parseMatchDate(a)-parseMatchDate(b); }));
   for(var gi=0;gi<grouped.days.length;gi++){
     var day=grouped.days[gi];
     html+='<p class="section-label">'+day+'</p><div class="match-card">';
@@ -614,7 +614,7 @@ function renderOthers() {
   var selector=renderStageSelector("others");
   document.getElementById("others-stage-selector").innerHTML=selector;
   var stageMatchesOth=matchesForStage(currentStage);
-  var grouped=groupByDay(stageMatchesOth.slice().sort(function(a,b){ var da=a.date+" "+a.time,db=b.date+" "+b.time; return da<db?-1:da>db?1:0; }));
+  var grouped=groupByDay(stageMatchesOth.slice().sort(function(a,b){ return parseMatchDate(a)-parseMatchDate(b); }));
   var html='';
   for(var gi=0;gi<grouped.days.length;gi++){
     var day=grouped.days[gi];
