@@ -4,6 +4,53 @@ var currentUser = null;
 var saveInProgress = false; // Zabraňuje souběžným zápisům
 var pendingSave = false; // Čeká se na uložení
 
+// Fáze turnaje
+var STAGES = [
+  { key: "GROUP_STAGE", label: "Základní část" },
+  { key: "LAST_32",     label: "Round of 32" },
+  { key: "LAST_16",     label: "Round of 16" },
+  { key: "QUARTER_FINALS", label: "Čtvrtfinále" },
+  { key: "SEMI_FINALS", label: "Semifinále" },
+  { key: "THIRD_PLACE", label: "O 3. místo" },
+  { key: "FINAL",       label: "Finále" },
+];
+var currentStage = "GROUP_STAGE";
+
+function getAvailableStages() {
+  var found = {};
+  for(var i=0;i<MATCHES.length;i++) found[MATCHES[i].stage||"GROUP_STAGE"]=true;
+  return STAGES.filter(function(s){ return found[s.key]; });
+}
+
+function renderStageSelector(containerId) {
+  var stages = getAvailableStages();
+  if(stages.length <= 1) return ""; // Jen jedna fáze — neskrývej nic
+  var html = '<div class="stage-selector">';
+  for(var i=0;i<stages.length;i++){
+    var s=stages[i];
+    var activeClass = s.key===currentStage ? " active" : "";
+    html += '<button class="stage-btn'+activeClass+'" data-stage="'+s.key+'" onclick="selectStage(this.dataset.stage)">'+s.label+'</button>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function selectStage(key) {
+  currentStage = key;
+  // Refresh všech aktivních záložek
+  var active = document.querySelector(".tab.active");
+  if(!active) return;
+  var id = active.id.replace("tab-","");
+  if(id==="tips") renderTips();
+  else if(id==="mytips") renderMyTips();
+  else if(id==="lb") renderLb();
+  else if(id==="others") renderOthers();
+}
+
+function matchesForStage(stage) {
+  return MATCHES.filter(function(m){ return (m.stage||"GROUP_STAGE")===stage; });
+}
+
 // Varování při zavření stránky pokud se tip ještě ukládá
 window.addEventListener("beforeunload", function(e) {
   if(pendingSave || saveInProgress) {
@@ -335,7 +382,10 @@ function renderTips() {
     return;
   }
   var tips=state.tips[currentUser]||{};
-  var grouped=groupByDay(sortedByDate());
+  var stageMatches=matchesForStage(currentStage);
+  var grouped=groupByDay(stageMatches.slice().sort(function(a,b){ var da=a.date+" "+a.time,db=b.date+" "+b.time; return da<db?-1:da>db?1:0; }));
+  var selector=renderStageSelector("tips");
+  document.getElementById("tips-stage-selector").innerHTML=selector;
   var html="";
   for(var gi=0;gi<grouped.days.length;gi++){
     var day=grouped.days[gi];
@@ -418,6 +468,8 @@ function renderMyTips() {
   var tips=state.tips[currentUser]||{};
   var champ=state.champion[currentUser];
   var tw=state.tournamentWinner;
+  var selector=renderStageSelector("mytips");
+  document.getElementById("mytips-stage-selector").innerHTML=selector;
   var champSection="";
   if(champ){
     var cb=tw
@@ -433,7 +485,8 @@ function renderMyTips() {
     +'<div class="metric"><div class="metric-val">'+p.winHit+'</div><div class="metric-lbl">Správný vítěz</div></div>'
     +'<div class="metric"><div class="metric-val">'+p.exact+'</div><div class="metric-lbl">Přesný výsledek</div></div>'
     +'</div>'+champSection;
-  var grouped=groupByDay(sortedByDate());
+  var stageMatchesMy=matchesForStage(currentStage);
+  var grouped=groupByDay(stageMatchesMy.slice().sort(function(a,b){ var da=a.date+" "+a.time,db=b.date+" "+b.time; return da<db?-1:da>db?1:0; }));
   for(var gi=0;gi<grouped.days.length;gi++){
     var day=grouped.days[gi];
     html+='<p class="section-label">'+day+'</p><div class="match-card">';
@@ -465,12 +518,55 @@ function renderMyTips() {
   refreshPts();
 }
 
+function calcPointsForStage(uid, stage) {
+  var pts=0, exact=0, winHit=0;
+  var tips = state.tips[uid]||{};
+  var stageMs = matchesForStage(stage);
+  for(var i=0;i<stageMs.length;i++){
+    var m=stageMs[i], t=tips[m.id], r=state.results[m.id];
+    if(!t||!r) continue;
+    if(t.home===""||t.away==="") continue;
+    if(r.home===null||r.away===null||r.home===undefined||r.away===undefined) continue;
+    if(r.status!=="FINISHED") continue;
+    var th=+t.home, ta=+t.away, rh=+r.home, ra=+r.away;
+    if(isNaN(th)||isNaN(ta)||isNaN(rh)||isNaN(ra)) continue;
+    if(winner(th,ta)===winner(rh,ra)){ pts+=2; winHit++; }
+    if(th===rh&&ta===ra){ pts+=3; exact++; }
+  }
+  return {pts:pts, exact:exact, winHit:winHit};
+}
+
+var lbMode = "total"; // "total" nebo "stage"
+
 function renderLb() {
+  var selector=renderStageSelector("lb");
+  document.getElementById("lb-stage-selector").innerHTML=selector;
+  
+  // Mode switcher
+  var modeSwitcher = '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    +'<button class="stage-btn'+(lbMode==="total"?" active":"")+'" onclick="setLbMode('+"'total'"+')">🏆 Celkem</button>'
+    +'<button class="stage-btn'+(lbMode==="stage"?" active":"")+'" onclick="setLbMode('+"'stage'"+')">Aktuální fáze</button>'
+    +'</div>';
+  
   var users=Object.keys(state.users);
-  var ranked=users.map(function(u){ var p=calcPoints(u); return {name:u,pts:p.pts}; });
+  var ranked;
+  if(lbMode==="total") {
+    // Součet všech fází + šampión
+    ranked=users.map(function(u){
+      var total=0;
+      for(var si=0;si<STAGES.length;si++){
+        total+=calcPointsForStage(u,STAGES[si].key).pts;
+      }
+      // Přidej 20b za správného šampióna
+      if(state.champion[u]&&state.tournamentWinner&&state.champion[u]===state.tournamentWinner) total+=20;
+      return {name:u,pts:total};
+    });
+  } else {
+    ranked=users.map(function(u){ var p=calcPointsForStage(u,currentStage); return {name:u,pts:p.pts}; });
+  }
   ranked.sort(function(a,b){ return b.pts-a.pts; });
   var medals=["🥇","🥈","🥉"];
-  var html='<p class="section-label">'+users.length+' hráčů</p><div class="lb-card">';
+  var html=modeSwitcher+'<p class="section-label">'+users.length+' hráčů · '+(lbMode==="total"?"celkové pořadí":"aktuální fáze")+'</p><div class="lb-card">';
   if(!ranked.length) html+='<p style="font-size:13px;color:var(--text2);text-align:center;padding:20px">Zatím nikdo.</p>';
   for(var i=0;i<ranked.length;i++){
     var p=ranked[i], champ=state.champion[p.name];
@@ -487,6 +583,11 @@ function renderLb() {
   document.getElementById("lb-container").innerHTML=html;
 }
 
+function setLbMode(mode) {
+  lbMode = mode;
+  renderLb();
+}
+
 function renderOthers() {
   // Všichni hráči — aktuální uživatel první
   var others=Object.keys(state.users).filter(function(u){ return u!==currentUser; });
@@ -495,7 +596,10 @@ function renderOthers() {
     document.getElementById("others-container").innerHTML='<p style="font-size:13px;color:var(--text2);text-align:center;padding:20px">Zatím nikdo netipoval.</p>';
     return;
   }
-  var grouped=groupByDay(sortedByDate());
+  var selector=renderStageSelector("others");
+  document.getElementById("others-stage-selector").innerHTML=selector;
+  var stageMatchesOth=matchesForStage(currentStage);
+  var grouped=groupByDay(stageMatchesOth.slice().sort(function(a,b){ var da=a.date+" "+a.time,db=b.date+" "+b.time; return da<db?-1:da>db?1:0; }));
   var html='';
   for(var gi=0;gi<grouped.days.length;gi++){
     var day=grouped.days[gi];
@@ -596,6 +700,24 @@ async function syncResults() {
   await loadState();
   // 2. Načti seznam zápasů (neupravuj výsledky z KV)
   await loadMatches(false);
+  // 3. Nastav výchozí fázi — preferuj poslední aktivní fázi
+  var stages = getAvailableStages();
+  if(stages.length > 0) {
+    // Najdi poslední fázi kde jsou TIMED zápasy (probíhající nebo nadcházející)
+    var activeStage = null;
+    for(var si=0;si<stages.length;si++){
+      var sm=matchesForStage(stages[si].key);
+      for(var mi=0;mi<sm.length;mi++){
+        if(sm[mi].status==="TIMED"||sm[mi].status==="IN_PLAY"){
+          activeStage=stages[si].key;
+          break;
+        }
+      }
+      if(activeStage) break;
+    }
+    if(activeStage) currentStage=activeStage;
+    else currentStage=stages[stages.length-1].key; // Poslední fáze pokud vše skončilo
+  }
   // 3. Event listener pro login
   document.getElementById("name-input").addEventListener("keydown", function(e){
     if(e.key==="Enter") login();
