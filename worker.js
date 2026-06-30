@@ -33,7 +33,8 @@ export default {
       const matches = (data.matches || []).map(m => {
         const h = m.homeTeam.name || "?", a = m.awayTeam.name || "?";
         const d = new Date(m.utcDate);
-        const sc = m.score && m.score.fullTime;
+        // Preferuj výsledek po 90 minutách (regularTime), ne po prodloužení/penaltách
+        const sc = m.score && (m.score.regularTime && (m.score.regularTime.home !== null) ? m.score.regularTime : m.score.fullTime);
         return {
           id: "m" + m.id, home: h, away: a,
           homeFlag: FLAGS[h] || "🏳️", awayFlag: FLAGS[a] || "🏳️",
@@ -310,7 +311,8 @@ export default {
 
       (data.matches || []).forEach(m => {
         if (["FINISHED","IN_PLAY","PAUSED"].includes(m.status)) {
-          const sc = m.score && m.score.fullTime;
+          // Preferuj výsledek po 90 minutách (regularTime), ne po prodloužení/penaltách
+        const sc = m.score && (m.score.regularTime && (m.score.regularTime.home !== null) ? m.score.regularTime : m.score.fullTime);
           state.results["m" + m.id] = {
             home: sc ? sc.home : 0,
             away: sc ? sc.away : 0,
